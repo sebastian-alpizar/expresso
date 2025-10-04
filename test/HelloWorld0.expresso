@@ -1,0 +1,19 @@
+// HelloWorld0.expresso - Lambdas con múltiples argumentos
+let add = (x, y) -> x + y
+print(add(5, 3))
+
+let mult = (a, b) -> a * b
+print(mult(4, 7))
+
+// Lambda que retorna otra lambda (usando función explícita)
+let makeAdder = x -> (y -> x + y)
+let add5 = makeAdder(5)
+print(add5(10))
+
+// Lambda sin parámetros
+let constant = () -> 42
+print(constant())
+
+// Operador ternario
+let result = (10 > 5) ? 100 : 200
+print(result)

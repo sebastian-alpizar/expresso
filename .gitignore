@@ -1,0 +1,45 @@
+# ============================
+# Expresso Project .gitignore
+# ============================
+
+# --- Compilación y binarios ---
+bin/
+out/
+build/
+*.class
+
+# --- Archivos generados por ANTLR ---
+generated/
+*.interp
+*.tokens
+
+# --- Librerías locales (subidas manualmente) ---
+!lib/.gitkeep   # Si quieres mantener la carpeta vacía en el repo
+
+# --- Archivos temporales del sistema ---
+.DS_Store
+Thumbs.db
+
+# --- Archivos de entorno / IDE ---
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VSCode
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# --- Archivos del sistema operativo ---
+# macOS
+*.DS_Store
+
+# Windows
+desktop.ini
+
+# --- Archivos temporales ---
+*.log
+*.tmp

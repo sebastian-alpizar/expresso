@@ -1,0 +1,33 @@
+// HelloWorld1.expresso - Precedencia y asociatividad
+let a = 2
+let b = 3
+let c = 4
+
+// Precedencia: ** tiene mayor precedencia
+let expr1 = a + b ** c  // 2 + (3^4) = 2 + 81 = 83
+print(expr1)
+
+// Asociatividad derecha de **
+let expr2 = a ** b ** c  // 2^(3^4) = 2^81
+print(expr2)
+
+// Precedencia de -> es la más baja
+let complexLambda = x -> y -> x + y * 2  // x -> (y -> (x + (y * 2)))
+let partial = complexLambda(5)
+print(partial(3))  // 5 + (3*2) = 11
+
+// Operador ternario con expresiones complejas
+let score = 85
+let grade = score >= 90 ? "A" : score >= 80 ? "B" : "C"
+print(grade)
+
+// Combinación de operadores
+let expr3 = a + b * c ** 2 / (a + 1)  // 2 + 3 * (4^2) / (2+1)
+print(expr3)
+
+// Lambdas con operadores lógicos
+let isPositive = x -> x > 0
+let isEven = x -> x % 2 == 0
+let checkNumber = x -> isPositive(x) && isEven(x) ? "Positive Even" : "Other"
+print(checkNumber(4))
+print(checkNumber(-3))
