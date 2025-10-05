@@ -132,17 +132,20 @@ El archivo `expressor.bat` permite realizar todas las acciones del compilador.
 
 .\expressor transpile --out generated examples\HelloWorld.expresso
 
+.\expressor transpile --out generated test\HelloWorld0.expresso
+.\expressor transpile --out generated test\HelloWorld1.expresso
+
 ---
 
 ### 2. Compilar
 
-.\expressor build --out output examples\HelloWorld0.expresso
+.\expressor build --out output examples\HelloWorld.expresso
 
 ---
 
 ### 3. Ejecutar
 
-.\expressor run --out output examples\HelloWorld0.expresso
+.\expressor run --out output examples\HelloWorld.expresso
 
 ---
 
