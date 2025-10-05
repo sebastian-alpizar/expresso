@@ -19,25 +19,6 @@
 Expresso es un minilenguaje educativo inspirado en la programación funcional.
 Su transpilador convierte código `.expresso` en Java usando ANTLR4, permitiendo ejecutar programas con lambdas, operadores lógicos, y expresiones de orden superior.
 
-## Estructura del Proyecto
-
-expresso/
-│
-├── expressor.bat                # Script CLI principal
-├── lib/
-│   └── antlr-4.13.2-complete.jar
-├── grammar/
-│   └── Expr.g4                  # Gramática ANTLR
-├── generated/                   # Archivos generados por ANTLR
-├── src/                         # Código fuente del transpilador
-│   ├── Main.java
-│   ├── CodeGen.java
-│   └── CodeGenVisitor.java
-├── bin/                         # Clases compiladas del transpilador
-└── examples/
-    ├── HelloWorld0.expresso
-    ├── HelloWorld1.expresso
-
 ### Características Principales
 
 - **Sintaxis funcional**: Tipos algebraicos, funciones y pattern matching
