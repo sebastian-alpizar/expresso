@@ -16,7 +16,27 @@
 // Grupo: 04-1pm
 ## Descripción
 
-Expresso es un minilenguaje diseñado para aprender cómo los lenguajes de programación modernos logran expresar ideas complejas con una sintaxis concisa. El proyecto implementa un transpilador que convierte código Expresso (estilo funcional con tipos algebraicos) a Java ejecutable.
+Expresso es un minilenguaje educativo inspirado en la programación funcional.
+Su transpilador convierte código `.expresso` en Java usando ANTLR4, permitiendo ejecutar programas con lambdas, operadores lógicos, y expresiones de orden superior.
+
+## Estructura del Proyecto
+
+expresso/
+│
+├── expressor.bat                # Script CLI principal
+├── lib/
+│   └── antlr-4.13.2-complete.jar
+├── grammar/
+│   └── Expr.g4                  # Gramática ANTLR
+├── generated/                   # Archivos generados por ANTLR
+├── src/                         # Código fuente del transpilador
+│   ├── Main.java
+│   ├── CodeGen.java
+│   └── CodeGenVisitor.java
+├── bin/                         # Clases compiladas del transpilador
+└── examples/
+    ├── HelloWorld0.expresso
+    ├── HelloWorld1.expresso
 
 ### Características Principales
 
@@ -58,28 +78,18 @@ static Nat sum(Nat x, Nat y) {
 
 ### Software Requerido
 
-#### 1. Java Development Kit (JDK) 23+
+1. Instalar Java JDK 23+
+   Descargar desde https://www.oracle.com/java/technologies/downloads/
 
-**Descarga e Instalación en Windows:**
-- Descargar desde [Oracle JDK 23](https://www.oracle.com/java/technologies/downloads/)
-- **Importante:** Debe ser JDK 23 o superior, versiones anteriores NO funcionarán
+Verificar instalación:
+java --version
+javac --version
 
-**Instalación paso a paso:**
-1. Descargar el instalador Windows x64 (`.msi`)
-2. Ejecutar como administrador
-3. Seguir el asistente de instalación
-4. Anotar la ruta de instalación (generalmente `C:\Program Files\Java\jdk-23`)
+Salida esperada:
+java 23.0.1 2024-10-15
+javac 23.0.1
 
-#### 2. Apache Maven 3.8+
-
-**Descarga e Instalación en Windows:**
-- Descargar desde: [Apache Maven](https://maven.apache.org/download.cgi)
-- Descargar el archivo `Binary zip archive`
-
-**Instalación paso a paso:**
-1. Descargar `apache-maven-x.x.x-bin.zip`
-2. Extraer en `C:\Program Files\Apache\maven\`
-3. Anotar la ruta completa (ej: `C:\Program Files\Apache\maven\apache-maven-3.9.4`)
+---
 
 ### Configuración de Variables de Entorno (Windows)
 
@@ -95,19 +105,12 @@ static Nat sum(Nat x, Nat y) {
     - Valor de variable: `C:\Program Files\Java\jdk-23` (ajustar según tu instalación)
     - Clic "Aceptar"
 
-3. **Crear MAVEN_HOME:**
-    - En "Variables del sistema" clic en "Nueva..."
-    - Nombre de variable: `MAVEN_HOME`
-    - Valor de variable: `C:\Program Files\Apache\maven\apache-maven-3.9.4`
-    - Clic "Aceptar"
-
-4. **Actualizar PATH:**
+3. **Actualizar PATH:**
     - En "Variables del sistema" seleccionar `Path` y clic "Editar..."
     - Clic "Nueva" y agregar: `%JAVA_HOME%\bin`
-    - Clic "Nueva" y agregar: `%MAVEN_HOME%\bin`
     - Clic "Aceptar" en todas las ventanas
 
-5. **Aplicar Cambios:**
+4. **Aplicar Cambios:**
     - Cerrar todas las ventanas con "Aceptar"
     - **Importante:** Cerrar y abrir nuevamente la terminal/cmd
 
@@ -129,11 +132,6 @@ java 23.0.1 2024-10-15
 Java(TM) SE Runtime Environment (build 23.0.1+11-39)
 Java HotSpot(TM) 64-Bit Server VM (build 23.0.1+11-39, mixed mode, sharing)
 
-C:\> mvn --version
-Apache Maven 3.9.4
-Maven home: C:\Program Files\Apache\maven\apache-maven-3.9.4
-Java version: 23.0.1, vendor: Oracle Corporation
-Java home: C:\Program Files\Java\jdk-23
 ```
 
 ### Solución de Problemas de Instalación
@@ -143,70 +141,75 @@ Java home: C:\Program Files\Java\jdk-23
 - Verificar que `%JAVA_HOME%\bin` esté en PATH
 - Cerrar y abrir nueva terminal
 
-**Si aparece error "'mvn' no se reconoce como comando":**
-- Verificar que MAVEN_HOME apunte a la carpeta correcta de Maven
-- Verificar que `%MAVEN_HOME%\bin` esté en PATH
-- Verificar que Java funcione correctamente primero
 
+## 🖥️ Uso desde la línea de comandos (Windows CMD)
 
-## Uso del CLI
-Se deben correr los siguientes comandos para crear los ejecutables y cargar los comandos que trabajan con JPACKAGE.
+El archivo `expressor.bat` permite realizar todas las acciones del compilador.
 
-Desde /expresso se abre CMD y se corre:
-```cmd
-mvn clean package
-# Esto limpia la carpeta target y compila el código fuente
-```
-Desde /expresso/dist/expressor se corre:
-```cmd
-jpackage ^
-  --name expressor ^
-  --input target ^
-  --main-jar expresso-1.0-SNAPSHOT-jar-with-dependencies.jar ^
-  --main-class cr.ac.una.Expressor ^
-  --type app-image ^
-  --win-console ^
-  --dest dist
-# Esto convierte la aplicación Java en un ejecutable nativo de Windows
-```
+---
 
-Esto permite pasar de:
-```cmd
-java -cp target\classes cr.ac.una.Expressor ...
-```
-Al comando propio de Expresso:
-```cmd
-expressor transpile archivo.expresso
-```
+### 1. Transpilar
 
+expressor transpile --out output examples\HelloWorld0.expresso
 
-### Transpilar
-Convierte código Expresso a Java:
+---
 
-```cmd
-expressor transpile --out output archivo.expresso
+### 2. Compilar
 
-# Genera: archivo.java, la opción "--verbose" al final permite ver los pasos
-```
+expressor build --out output examples\HelloWorld0.expresso
 
-### Compilar
-Transpila y compila a bytecode Java:
+---
 
-```cmd
-expressor build --out output archivo.expresso
+### 3. Ejecutar
 
-# Genera: archivo.java y archivo.class
-```
+expressor run --out output examples\HelloWorld0.expresso
 
-### Ejecutar
-Transpila, compila y ejecuta el programa:
+---
 
-```cmd
-expressor run --out output archivo.expresso
+## Ejemplo de Código Expresso
 
-# Ejecuta el programa directamente
-```
+examples/HelloWorld1.expresso
+---------------------------------
+let a = 2
+let b = 3
+let c = 4
 
+let expr1 = a + b ** c
+print(expr1)
+
+let expr2 = a ** b ** c
+print(expr2)
+
+let complexLambda = x -> y -> x + y * 2
+let partial = complexLambda(5)
+print(partial(3))
+
+let score = 85
+let grade = score >= 90 ? "A" : score >= 80 ? "B" : "C"
+print(grade)
+
+Salida Esperada:
+83
+2417851639229258349412352
+11
+B
+
+---
+
+examples/HelloWorld0.expresso
+---------------------------------
+let add = (x, y) -> x + y
+print(add(5, 3))
+
+let makeAdder = x -> (y -> x + y)
+let add5 = makeAdder(5)
+print(add5(10))
+
+Salida:
+8
+15
+
+---
 
 ## Componentes del Sistema
 
