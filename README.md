@@ -142,7 +142,7 @@ Java HotSpot(TM) 64-Bit Server VM (build 23.0.1+11-39, mixed mode, sharing)
 - Cerrar y abrir nueva terminal
 
 
-## 🖥️ Uso desde la línea de comandos (Windows CMD)
+## Uso desde la línea de comandos (Windows CMD)
 
 El archivo `expressor.bat` permite realizar todas las acciones del compilador.
 
@@ -150,19 +150,19 @@ El archivo `expressor.bat` permite realizar todas las acciones del compilador.
 
 ### 1. Transpilar
 
-expressor transpile --out output examples\HelloWorld0.expresso
+.\expressor transpile --out generated examples\HelloWorld.expresso
 
 ---
 
 ### 2. Compilar
 
-expressor build --out output examples\HelloWorld0.expresso
+.\expressor build --out output examples\HelloWorld0.expresso
 
 ---
 
 ### 3. Ejecutar
 
-expressor run --out output examples\HelloWorld0.expresso
+.\expressor run --out output examples\HelloWorld0.expresso
 
 ---
 
