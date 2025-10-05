@@ -121,7 +121,6 @@ javac 23.0.1
 ```cmd
 java --version
 javac --version
-mvn --version
 ```
 
 **Salidas esperadas:**
