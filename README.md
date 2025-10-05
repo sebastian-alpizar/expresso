@@ -274,6 +274,10 @@ Se adjuntan conversaciones con ChatGPT que sirvieron de apoyo para el desarrollo
 - **Curso**: EIF400-II-2025 - Paradigmas de Programación
 - **Institución**: Escuela de Informática, UNA
 
+## Apoyo de IA
+Se adjuntan conversaciones con ChatGPT que sirvieron de apoyo para el desarrollo del proyecto:
+https://chatgpt.com/c/68e0245b-283c-832f-87e7-afd2bbb3f30a
+
 ## Licencia
 
 Proyecto académico para fines educativos únicamente.
