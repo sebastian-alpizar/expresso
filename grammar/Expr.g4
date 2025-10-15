@@ -17,8 +17,13 @@ expression
     ;
 
 lambdaExpression
-    : ID '->' expression
-    | '(' ID '->' expression ')'
+    : lambdaParams '->' expression
+    | '(' lambdaParams '->' expression ')'
+    ;
+
+lambdaParams
+    : ID (',' ID)*
+    | '(' ID (',' ID)* ')'
     ;
 
 additiveExpression
@@ -45,9 +50,12 @@ primaryExpression
     | functionCall
     ;
 
-functionCall: ID '(' expression? ')';
+functionCall: ID '(' (expression (',' expression)*)? ')';
 
 ID: [a-zA-Z_][a-zA-Z0-9_]*;
 INTEGER: [0-9]+;
 WS: [ \t\r\n]+ -> skip;
+
+// Mejora las reglas de comentarios para soportar caracteres especiales
 COMMENT: '//' ~[\r\n]* -> skip;
+MULTILINE_COMMENT: '/*' .*? '*/' -> skip;  // Cambio importante aquí

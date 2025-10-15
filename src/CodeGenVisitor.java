@@ -3,6 +3,8 @@ import java.util.*;
 public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private StringBuilder mainBody = new StringBuilder();
     private Set<String> declaredVariables = new HashSet<>();
+    private Map<String, String> variableTypes = new HashMap<>();
+    private int lambdaCounter = 0;
     
     @Override
     public String visitProgram(ExprParser.ProgramContext ctx) {
@@ -26,6 +28,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         
         // Determinar el tipo basado en el valor
         String type = inferType(ctx.expression());
+        variableTypes.put(varName, type);
         
         if (!declaredVariables.contains(varName)) {
             declaredVariables.add(varName);
@@ -36,12 +39,24 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
     
     private String inferType(ExprParser.ExpressionContext expr) {
-        // Si el valor contiene una expresión lambda, usar UnaryOperator<Integer>
+        // Si es una expresión lambda, determinar el tipo de función
         if (expr.lambdaExpression() != null) {
-            return "UnaryOperator<Integer>";
+            ExprParser.LambdaExpressionContext lambda = expr.lambdaExpression();
+            int paramCount = getLambdaParamCount(lambda.lambdaParams());
+            
+            switch (paramCount) {
+                case 1: return "UnaryOperator<Integer>";
+                case 2: return "BinaryOperator<Integer>";
+                default: return "Function<Integer, Integer>";
+            }
         } else {
             return "int";
         }
+    }
+    
+    private int getLambdaParamCount(ExprParser.LambdaParamsContext params) {
+        if (params == null) return 0;
+        return params.ID().size();
     }
     
     @Override
@@ -51,11 +66,48 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
     
     @Override
+    public String visitLambdaParams(ExprParser.LambdaParamsContext ctx) {
+        // Solo recolectar los parámetros, no generar código aquí
+        return null;
+    }
+    
+    @Override
     public String visitLambdaExpression(ExprParser.LambdaExpressionContext ctx) {
-        String param = ctx.ID().getText();
+        List<String> params = new ArrayList<>();
+        if (ctx.lambdaParams().ID() != null) {
+            for (var id : ctx.lambdaParams().ID()) {
+                String originalParam = id.getText();
+                // Verificar si el parámetro ya está declarado en el ámbito
+                String safeParam = getSafeParameterName(originalParam);
+                params.add(safeParam);
+            }
+        }
+        
         String body = visit(ctx.expression());
-        // Solo devolver la expresión lambda, sin el tipo
-        return String.format("%s -> %s", param, body);
+        
+        // Construir la expresión lambda según el número de parámetros
+        if (params.size() == 1) {
+            return String.format("%s -> %s", params.get(0), body);
+        } else if (params.size() == 2) {
+            return String.format("(%s, %s) -> %s", params.get(0), params.get(1), body);
+        } else {
+            // Para más parámetros, usar Function
+            StringBuilder paramList = new StringBuilder();
+            for (int i = 0; i < params.size(); i++) {
+                if (i > 0) paramList.append(", ");
+                paramList.append(params.get(i));
+            }
+            return String.format("(%s) -> %s", paramList.toString(), body);
+        }
+    }
+
+    private String getSafeParameterName(String originalName) {
+        // Si el parámetro ya está declarado como variable, generar un nombre único
+        if (declaredVariables.contains(originalName)) {
+            lambdaCounter++;
+            return originalName + "_" + lambdaCounter;
+        }
+        return originalName;
     }
     
     @Override
@@ -106,7 +158,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             return visit(expressions.get(0));
         }
         
-        // Usar Math.pow para exponenciación - con import estático ya no necesita el import
+        // Usar Math.pow para exponenciación
         String result = visit(expressions.get(expressions.size() - 1));
         for (int i = expressions.size() - 2; i >= 0; i--) {
             String base = visit(expressions.get(i));
@@ -148,16 +200,30 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     public String visitFunctionCall(ExprParser.FunctionCallContext ctx) {
         String functionName = ctx.ID().getText();
         
-        if (ctx.expression() != null) {
-            String argument = visit(ctx.expression());
-            
-            // Si es una variable lambda, usar .apply()
-            if (declaredVariables.contains(functionName)) {
-                return String.format("%s.apply(%s)", functionName, argument);
-            } else {
-                // Si es una función matemática
-                return String.format("%s(%s)", functionName, argument);
+        if (ctx.expression() != null && ctx.expression().size() > 0) {
+            List<String> arguments = new ArrayList<>();
+            for (ExprParser.ExpressionContext expr : ctx.expression()) {
+                arguments.add(visit(expr));
             }
+            
+            String argsString = String.join(", ", arguments);
+            
+            // Si es una variable lambda, usar .apply() o el método apropiado
+            if (declaredVariables.contains(functionName)) {
+                String type = variableTypes.get(functionName);
+                if (type != null) {
+                    if (type.equals("UnaryOperator<Integer>")) {
+                        return String.format("%s.apply(%s)", functionName, argsString);
+                    } else if (type.equals("BinaryOperator<Integer>")) {
+                        return String.format("%s.apply(%s)", functionName, argsString);
+                    } else {
+                        return String.format("%s.apply(%s)", functionName, argsString);
+                    }
+                }
+            }
+            
+            // Si es una función matemática
+            return String.format("%s(%s)", functionName, argsString);
         }
         
         return String.format("%s()", functionName);
