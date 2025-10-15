@@ -1,0 +1,20 @@
+
+// HelloWorld1.expresso
+
+let n =  4
+print(n)
+
+/*
+  Factorial function
+  @author hooNous
+  @since Oct 6th, 2025
+*/
+
+let isZero = x -> x ? 0 : 1
+let fact = n -> isZero(n) ? n * fact(n - 1) : 1
+
+/*
+ Expected 26
+*/
+print(26)
+print(fact( n - 1 ) + fact( n + 1))
