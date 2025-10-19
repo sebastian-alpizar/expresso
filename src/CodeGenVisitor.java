@@ -1,10 +1,32 @@
 import java.util.*;
 
+import org.antlr.v4.runtime.ParserRuleContext;
+
 public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private StringBuilder mainBody = new StringBuilder();
     private Set<String> declaredVariables = new HashSet<>();
     private Map<String, String> variableTypes = new HashMap<>();
     private int lambdaCounter = 0;
+
+    private String debug(String label, ParserRuleContext ctx, String result) {
+        String text = ctx.getText().replaceAll("\\s+", " ");
+        System.out.println("[DEBUG] " + label + " -> " + text);
+        System.out.println("         Result: " + result);
+        System.out.println("-------------------------------------------");
+        return result;
+    }
+
+    public void printTree(ParserRuleContext ctx, int indent) {
+        String spaces = "  ".repeat(indent);
+        System.out.println(spaces + ctx.getClass().getSimpleName() + ": " + ctx.getText());
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            if (ctx.getChild(i) instanceof ParserRuleContext) {
+                printTree((ParserRuleContext) ctx.getChild(i), indent + 1);
+            } else {
+                System.out.println(spaces + "  " + ctx.getChild(i).getClass().getSimpleName() + ": " + ctx.getChild(i).getText());
+            }
+        }
+    }
     
     @Override
     public String visitProgram(ExprParser.ProgramContext ctx) {
@@ -25,17 +47,18 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     public String visitLetStatement(ExprParser.LetStatementContext ctx) {
         String varName = ctx.ID().getText();
         String value = visit(ctx.expression());
-        
-        // Determinar el tipo basado en el valor
         String type = inferType(ctx.expression());
         variableTypes.put(varName, type);
-        
+
+        String code;
         if (!declaredVariables.contains(varName)) {
             declaredVariables.add(varName);
-            return String.format("%s %s = %s;", type, varName, value);
+            code = String.format("%s %s = %s;", type, varName, value);
         } else {
-            return String.format("%s = %s;", varName, value);
+            code = String.format("%s = %s;", varName, value);
         }
+
+        return debug("LetStatement(" + varName + ")", ctx, code);
     }
     
     private String inferType(ExprParser.ExpressionContext expr) {
@@ -76,29 +99,49 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         List<String> params = new ArrayList<>();
         if (ctx.lambdaParams().ID() != null) {
             for (var id : ctx.lambdaParams().ID()) {
-                String originalParam = id.getText();
-                // Verificar si el parámetro ya está declarado en el ámbito
-                String safeParam = getSafeParameterName(originalParam);
-                params.add(safeParam);
+                params.add(getSafeParameterName(id.getText()));
             }
         }
-        
+
+        // PROCESAR DIRECTAMENTE LA EXPRESIÓN DEL CUERPO
         String body = visit(ctx.expression());
-        
-        // Construir la expresión lambda según el número de parámetros
+
+        // Si el cuerpo es solo un identificador que representa una función lambda,
+        // necesitamos agregar .apply() con los parámetros apropiados
+        body = processLambdaBodyIfNeeded(body, params);
+
+        String code;
         if (params.size() == 1) {
-            return String.format("%s -> %s", params.get(0), body);
+            code = params.get(0) + " -> " + body;
         } else if (params.size() == 2) {
-            return String.format("(%s, %s) -> %s", params.get(0), params.get(1), body);
+            code = "(" + params.get(0) + ", " + params.get(1) + ") -> " + body;
         } else {
-            // Para más parámetros, usar Function
-            StringBuilder paramList = new StringBuilder();
-            for (int i = 0; i < params.size(); i++) {
-                if (i > 0) paramList.append(", ");
-                paramList.append(params.get(i));
-            }
-            return String.format("(%s) -> %s", paramList.toString(), body);
+            code = "(" + String.join(", ", params) + ") -> " + body;
         }
+
+        return debug("LambdaExpression(" + params + ")", ctx, code);
+    }
+
+    private String processLambdaBodyIfNeeded(String body, List<String> params) {
+        // Si el cuerpo es solo una variable lambda declarada, agregar .apply()
+        if (declaredVariables.contains(body) && !params.isEmpty()) {
+            String type = variableTypes.get(body);
+            if (type != null) {
+                switch (type) {
+                    case "UnaryOperator<Integer>":
+                        if (params.size() == 1) {
+                            return body + ".apply(" + params.get(0) + ")";
+                        }
+                        break;
+                    case "BinaryOperator<Integer>":
+                        if (params.size() == 2) {
+                            return body + ".apply(" + params.get(0) + ", " + params.get(1) + ")";
+                        }
+                        break;
+                }
+            }
+        }
+        return body;
     }
 
     private String getSafeParameterName(String originalName) {
@@ -181,6 +224,9 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     
     @Override
     public String visitPrimaryExpression(ExprParser.PrimaryExpressionContext ctx) {
+        if (ctx.functionCall() != null) {
+            return visit(ctx.functionCall());
+        }
         if (ctx.INTEGER() != null) {
             return ctx.INTEGER().getText();
         }
@@ -190,43 +236,60 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         if (ctx.expression() != null) {
             return visit(ctx.expression());
         }
-        if (ctx.functionCall() != null) {
-            return visit(ctx.functionCall());
-        }
         return "";
     }
     
     @Override
     public String visitFunctionCall(ExprParser.FunctionCallContext ctx) {
         String functionName = ctx.ID().getText();
-        
-        if (ctx.expression() != null && ctx.expression().size() > 0) {
-            List<String> arguments = new ArrayList<>();
-            for (ExprParser.ExpressionContext expr : ctx.expression()) {
-                arguments.add(visit(expr));
-            }
+        List<String> args = new ArrayList<>();
+        for (ExprParser.ExpressionContext expr : ctx.expression()) {
+            args.add(visit(expr));
+        }
+
+        String argsString = String.join(", ", args);
+
+        // **CAMBIAR ESTA LÓGICA** - Siempre tratar como función lambda si está declarada
+        if (declaredVariables.contains(functionName)) {
+            String type = variableTypes.get(functionName);
             
-            String argsString = String.join(", ", arguments);
-            
-            // Si es una variable lambda, usar .apply() o el método apropiado
-            if (declaredVariables.contains(functionName)) {
-                String type = variableTypes.get(functionName);
-                if (type != null) {
-                    if (type.equals("UnaryOperator<Integer>")) {
-                        return String.format("%s.apply(%s)", functionName, argsString);
-                    } else if (type.equals("BinaryOperator<Integer>")) {
-                        return String.format("%s.apply(%s)", functionName, argsString);
-                    } else {
-                        return String.format("%s.apply(%s)", functionName, argsString);
-                    }
+            // **AGREGAR ESTA VERIFICACIÓN ADICIONAL**
+            if (type != null && (type.contains("Operator") || type.contains("Function"))) {
+                // Es una función lambda, usar .apply()
+                if (args.size() == 1) {
+                    return String.format("%s.apply(%s)", functionName, argsString);
+                } else if (args.size() == 2) {
+                    return String.format("%s.apply(%s, %s)", functionName, args.get(0), args.get(1));
+                } else {
+                    return String.format("%s.apply(%s)", functionName, argsString);
                 }
             }
-            
-            // Si es una función matemática
-            return String.format("%s(%s)", functionName, argsString);
         }
         
-        return String.format("%s()", functionName);
+        // **AGREGAR DEBUG PARA IDENTIFICAR EL PROBLEMA**
+        return functionName + "(" + argsString + ")";
+    }
+
+    @Override
+    public String visitExpression(ExprParser.ExpressionContext ctx) {
+        if (ctx.lambdaExpression() != null) {
+            return visit(ctx.lambdaExpression());
+        } else if (ctx.ternaryExpression() != null) {
+            return visit(ctx.ternaryExpression());
+        } else if (ctx.additiveExpression() != null) {
+            return visit(ctx.additiveExpression());
+        }
+        return visitChildren(ctx);
+    }
+
+    @Override
+    public String visitTernaryExpression(ExprParser.TernaryExpressionContext ctx) {        
+        String condition = visit(ctx.additiveExpression());
+        String trueExpr = visit(ctx.expression(0));
+        String falseExpr = visit(ctx.expression(1));
+
+        String code = "(" + condition + " != 0 ? " + trueExpr + " : " + falseExpr + ")";
+        return debug("TernaryExpression", ctx, code);
     }
     
     public String getMainBody() {

@@ -13,7 +13,12 @@ printStatement: 'print' '(' expression ')';
 
 expression
     : lambdaExpression
+    | ternaryExpression
     | additiveExpression
+    ;
+
+ternaryExpression
+    : additiveExpression '?' expression ':' expression
     ;
 
 lambdaExpression
@@ -44,10 +49,10 @@ unaryExpression
     ;
 
 primaryExpression
-    : INTEGER
+    : functionCall
+    | INTEGER
     | ID
-    | '(' expression ')'
-    | functionCall
+    | '(' expression ')' 
     ;
 
 functionCall: ID '(' (expression (',' expression)*)? ')';
@@ -56,6 +61,5 @@ ID: [a-zA-Z_][a-zA-Z0-9_]*;
 INTEGER: [0-9]+;
 WS: [ \t\r\n]+ -> skip;
 
-// Mejora las reglas de comentarios para soportar caracteres especiales
 COMMENT: '//' ~[\r\n]* -> skip;
-MULTILINE_COMMENT: '/*' .*? '*/' -> skip;  // Cambio importante aquí
+MULTILINE_COMMENT: '/*' .*? '*/' -> skip;
