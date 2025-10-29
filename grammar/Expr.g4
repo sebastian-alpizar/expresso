@@ -58,6 +58,16 @@ lambdaExpression
 lambdaParams
     : ID (',' ID)*
     | '(' ID (',' ID)* ')'
+    | typedLambdaParams
+    ;
+
+typedLambdaParams
+    : typedParam (',' typedParam)*
+    | '(' typedParam (',' typedParam)* ')'
+    ;
+
+typedParam
+    : ID ':' type
     ;
 
 additiveExpression

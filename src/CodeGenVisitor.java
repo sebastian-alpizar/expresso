@@ -40,7 +40,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         mainBody.append("}\n");
         return mainBody.toString();
     }
-
     
     @Override // ---------------- LET ----------------
     public String visitLetStatement(ExprParser.LetStatementContext ctx) {
@@ -93,21 +92,45 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         for (int i = 0; i < paramTypes.length; i++) {
             paramTypes[i] = paramTypes[i].trim();
         }
-
         // solo devolvemos la lista de tipos; nombres los obtendremos en visitLambdaExpression
         for (int i = 0; i < paramTypes.length; i++) {
             map.put(String.valueOf(i), normalizeType(paramTypes[i])); // clave: índice como string
         }
         return map;
     }
-
     
     private String inferType(ExprParser.ExpressionContext expr) {
         if (expr == null) return "int";
         if (expr.lambdaExpression() != null) {
-            int paramCount = getLambdaParamCount(expr.lambdaExpression().lambdaParams());
+            var lambda = expr.lambdaExpression();
+
+            // Si los parámetros están tipados, podemos construir el tipo exacto
+            if (lambda.lambdaParams().typedLambdaParams() != null) {
+                List<ExprParser.TypedParamContext> typedParams = 
+                    lambda.lambdaParams().typedLambdaParams().typedParam();
+
+                List<String> paramTypes = new ArrayList<>();
+                for (ExprParser.TypedParamContext tp : typedParams) {
+                    paramTypes.add(mapTypeName(tp.type().getText())); // convierte float->Float, int->Integer...
+                }
+
+                // Inferir tipo de retorno según el cuerpo de la lambda
+                String returnType = inferPrimitiveType(visit(lambda.expression()));
+
+                // Generar tipo de función adecuado
+                if (paramTypes.size() == 1)
+                    return String.format("Function<%s, %s>", paramTypes.get(0), mapTypeName(returnType));
+                else if (paramTypes.size() == 2)
+                    return String.format("BiFunction<%s, %s, %s>", paramTypes.get(0), paramTypes.get(1), mapTypeName(returnType));
+                else
+                    return String.format("Supplier<%s>", mapTypeName(returnType));
+            }
+
+            // Si NO hay tipos explícitos, seguimos usando el comportamiento antiguo
+            int paramCount = getLambdaParamCount(lambda.lambdaParams());
             return (paramCount == 1 ? "UnaryOperator<Integer>" : "BinaryOperator<Integer>");
         }
+
         String text = expr.getText();
         if (scopeManager.isVarDeclared(text)) {
             String scopedType = scopeManager.getVarType(text);
@@ -138,44 +161,60 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         scopeManager.enterScope(); // Nuevo scope de lambda
         List<String> params = new ArrayList<>();
 
+        // --- Soporta tanto ID como typedParam ---
         List<org.antlr.v4.runtime.tree.TerminalNode> ids = ctx.lambdaParams().ID();
-        if (ids != null && !ids.isEmpty()) {
-            // Si hay pending types se usan, si no, déjalos sin tipo por ahora
-            for (int i = 0; i < ids.size(); i++) {
-                String original = ids.get(i).getText();
-                String declaredType = null;
-                if (pendingLambdaParamTypes != null && pendingLambdaParamTypes.containsKey(String.valueOf(i)))
-                    declaredType = pendingLambdaParamTypes.get(String.valueOf(i));
+        List<ExprParser.TypedParamContext> typedParams = null;
+        if (ctx.lambdaParams().typedLambdaParams() != null)
+            typedParams = ctx.lambdaParams().typedLambdaParams().typedParam();
 
-                String finalName = original;
+        if ((ids != null && !ids.isEmpty()) || (typedParams != null && !typedParams.isEmpty())) {
+            // Parámetros simples sin tipo explícito
+            if (ids != null && !ids.isEmpty()) {
+                for (int i = 0; i < ids.size(); i++) {
+                    String original = ids.get(i).getText();
+                    String declaredType = null;
+                    if (pendingLambdaParamTypes != null && pendingLambdaParamTypes.containsKey(String.valueOf(i)))
+                        declaredType = pendingLambdaParamTypes.get(String.valueOf(i));
 
-                // Si hay una variable con el mismo nombre en scopes exteriores -> obtener safe name
-                if (scopeManager.isVarDeclared(original)) // getSafeName solo devuelve un nuevo safe si hace falta; no la declare aún
-                    finalName = scopeManager.getSafeName(original);
-                
-                // declarar en el scope actual con su tipo
-                if (declaredType != null)
+                    String finalName = scopeManager.isVarDeclared(original)
+                            ? scopeManager.getSafeName(original)
+                            : original;
+
+                    if (declaredType != null)
+                        scopeManager.declareVar(finalName, declaredType);
+                    else
+                        scopeManager.declareVar(finalName);
+
+                    params.add(finalName);
+                }
+            }
+
+            // Parámetros tipados (x:float, n:int)
+            if (typedParams != null && !typedParams.isEmpty()) {
+                for (ExprParser.TypedParamContext tp : typedParams) {
+                    String original = tp.ID().getText();
+                    String declaredType = mapType(tp.type());
+                    String finalName = scopeManager.isVarDeclared(original)
+                            ? scopeManager.getSafeName(original)
+                            : original;
+
                     scopeManager.declareVar(finalName, declaredType);
-                else
-                    scopeManager.declareVar(finalName);
-
-                params.add(finalName);
+                    params.add(finalName);
+                }
             }
         }
-        // una vez consumidos los pending types, limpiarlos para que no afecten a otras lambdas
-        pendingLambdaParamTypes = null;
 
+        pendingLambdaParamTypes = null; // limpiar después de usar
         String body = visit(ctx.expression());
         body = processLambdaBodyIfNeeded(body, params);
-        scopeManager.exitScope(); // salir del scope de lambda
+        scopeManager.exitScope();
 
-        String code;
-        if (params.size() == 1)
-            code = params.get(0) + " -> " + body;
-        else
-            code = "(" + String.join(", ", params) + ") -> " + body;
+        String code = (params.size() == 1)
+                ? params.get(0) + " -> " + body
+                : "(" + String.join(", ", params) + ") -> " + body;
         return code;
     }
+
 
 
     private String processLambdaBodyIfNeeded(String body, List<String> params) {
@@ -431,5 +470,4 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
         return "int";
     }
-
 }
