@@ -1,0 +1,6 @@
+let x = 666
+let PI:float = 3.14
+fun cat(s:string, t:string):string = s + t
+let msg = "Hello \"World\"\n"
+print(cat(msg, "!!"))
+let my_pow:((float, int) -> float) = (x, n) -> x ** n

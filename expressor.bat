@@ -61,9 +61,7 @@ if "%1"=="transpile" (
     )
 
     if "!REGEN_PARSER!"=="1" (
-        echo ===============================
         echo [1/3] Generando parser ANTLR...
-        echo ===============================
         java -jar "%ANTLR_JAR%" -Dlanguage=Java -visitor -o "%PARSER_OUT%" "%GRAMMAR%"
         if errorlevel 1 (
             echo [ERROR] Error generando el parser.
@@ -90,9 +88,7 @@ if "%1"=="transpile" (
     )
 
     if "!NEED_COMPILE!"=="1" (
-        echo ===============================
         echo [2/3] Compilando transpilador...
-        echo ===============================
         javac -cp "%ANTLR_JAR%;." -d "%TRANSPILER_BIN%" "%PARSER_OUT%\*.java" "%TRANSPILER_SRC%\*.java"
         if errorlevel 1 (
             echo [ERROR] Error compilando el transpilador.
@@ -105,9 +101,7 @@ if "%1"=="transpile" (
     :: ===============================
     :: [3] Ejecutar transpilacion
     :: ===============================
-    echo ===============================
     echo [3/3] Ejecutando transpilacion...
-    echo ===============================
 
     java -cp "%ANTLR_JAR%;%TRANSPILER_BIN%;." %EXPRESSOR_MAIN% %*
     goto :eof
@@ -142,3 +136,17 @@ if "%1"=="transpile" (
 
 :eof
 endlocal
+
+@REM expressor build --out dir archivo.expresso
+@REM     │
+@REM     ├── [1] Generar parser ANTLR (si es necesario)
+@REM     ├── [2] Compilar TODOS los .java en src/ (incluye TyperVisitor)  
+@REM     ├── [3] Ejecutar Main con typing + codegen
+@REM     │     │
+@REM     │     ├── FASE TYPING: TyperVisitor visita AST
+@REM     │     │   ├── Si hay errores → termina con código 1
+@REM     │     │   └── Si no hay errores → genera .typings y continúa
+@REM     │     │
+@REM     │     └── FASE CODEGEN: CodeGenVisitor genera .java
+@REM     │
+@REM     └── [4] Compilar el .java generado

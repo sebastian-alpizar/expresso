@@ -34,13 +34,32 @@ public class Main {
         parser.addErrorListener(new DiagnosticErrorListener());
 
         ParseTree tree = parser.program();
-
-        // Generar código Java
-        CodeGenVisitor gen = new CodeGenVisitor();
-        gen.visit(tree);
-
+        
+         // ===============================
+        // FASE DE TYPING
+        // ===============================
         String baseName = Paths.get(inPath).getFileName().toString();
         baseName = baseName.substring(0, baseName.length() - ".expresso".length());
+
+        TyperVisitor typer = new TyperVisitor(baseName + ".expresso");
+        typer.visit(tree);
+
+        if (typer.hasErrors()) {
+            typer.printErrors();
+            System.err.println("Build failed due to typing errors");
+            System.exit(1);
+        }
+
+        // Generar archivo .typings
+        Path typingsFile = Paths.get(outDir).resolve(baseName + ".expresso.typings");
+        typer.generateTypingsFile(typingsFile.toString());
+        System.out.println("Generated: " + typingsFile.toAbsolutePath());
+
+        // ===============================
+        // FASE DE GENERACIÓN DE CÓDIGO
+        // ===============================
+        CodeGenVisitor gen = new CodeGenVisitor();
+        gen.visit(tree);
 
         // Usar la información del visitor para determinar imports
         String javaSource = CodeGen.header(baseName) + 

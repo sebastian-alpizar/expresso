@@ -4,12 +4,41 @@ program: (statement ';'?)* EOF;
 
 statement
     : letStatement
+    | funStatement
     | printStatement
     | expression
     ;
 
-letStatement: 'let' ID '=' expression;
-printStatement: 'print' '(' expression ')';
+letStatement
+    : 'let' ID (':' type)? '=' expression
+    ;
+
+funStatement
+    : 'fun' ID '(' paramList? ')' (':' type)? '=' expression
+    ;
+
+paramList
+    : param (',' param)*
+    ;
+
+param
+    : ID ':' type
+    ;
+    
+type
+    : 'int'
+    | 'float'
+    | 'string'
+    | '(' typeList '->' type ')'
+    ;
+
+typeList
+    : type (',' type)*
+    ;
+
+printStatement
+    : 'print' '(' expression ')'
+    ;
 
 expression
     : lambdaExpression
@@ -50,16 +79,23 @@ unaryExpression
 
 primaryExpression
     : functionCall
+    | FLOAT
     | INTEGER
+    | STRING
     | ID
-    | '(' expression ')' 
+    | '(' expression ')'
     ;
 
-functionCall: ID '(' (expression (',' expression)*)? ')';
+functionCall
+    : ID '(' (expression (',' expression)*)? ')'
+    ;
 
 ID: [a-zA-Z_][a-zA-Z0-9_]*;
 INTEGER: [0-9]+;
-WS: [ \t\r\n]+ -> skip;
+FLOAT: [0-9]+'.'[0-9]+;
+STRING: '"' (ESC | ~["\\])* '"';
+fragment ESC: '\\' (["\\/bfnrt]);
 
+WS: [ \t\r\n]+ -> skip;
 COMMENT: '//' ~[\r\n]* -> skip;
 MULTILINE_COMMENT: '/*' .*? '*/' -> skip;
