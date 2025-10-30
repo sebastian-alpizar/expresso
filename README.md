@@ -1,287 +1,183 @@
-# Expresso - Minilenguaje Funcional
-// Expresso: Un minilenguaje muy concentrado
+# Expressor - Transpilador de .expresso a Java 🚀
 
-// Paradigmas de Programación
+[![Java](https://img.shields.io/badge/Java-007396?style=for-the-badge&logo=java&logoColor=white)](https://www.java.com/es/)
+[![ANTLR](https://img.shields.io/badge/ANTLR-4.13.2-9BC53D?style=for-the-badge&logo=antlr&logoColor=white)](https://www.antlr.org/)
 
-// 1) Nombre: Alexander Javier Vega Méndez ID: 402620735 correo: alexander.vega.mendez@est.una.ac.cr HORARIO: 1 pm [Coordinador]
+### Integrantes 🦹
+1) Nombre:  Sebastián Alpízar Porras ID: 118240079 correo: sebastian.alpizar.porras@est.una.ac.cr  
 
-// 2) Nombre: Luis Diego Fallas Brizuela ID: 118720684 correo: luis.fallas.brizuela@est.una.ac.cr HORARIO: 1 pm
+HORARIO: 1 pm  
+Grupo: 04-1pm
 
-// 3) Nombre:  Sebastián Alpízar Porras ID: 118240079 correo: sebastian.alpizar.porras@est.una.ac.cr HORARIO: 1 pm
+## 📋 Descripción del Proyecto
 
-// 4) Nombre: César Hernández Orozco ID: 118520198 correo: cesar.hernandez.orozco@est.una.ac.cr HORARIO: 1 pm
-
-// 5) Nombre: Daniel Solano Ávila ID: 119060141 correo: daniel.solano.avila@est.una.ac.cr HORARIO: 1 pm
-
-// Grupo: 04-1pm
-## Descripción
-
-Expresso es un minilenguaje educativo inspirado en la programación funcional.
-Su transpilador convierte código `.expresso` en Java usando ANTLR4, permitiendo ejecutar programas con lambdas, operadores lógicos, y expresiones de orden superior.
+Expresso es un minilenguaje educativo inspirado en la programación funcional. Su transpilador convierte código .expresso en Java usando ANTLR4, permitiendo ejecutar programas con lambdas, operadores lógicos, y expresiones de orden superior.
 
 ### Características Principales
+- Sintaxis funcional: Tipos algebraicos, funciones y pattern matching
+- Transpilación a Java: Genera código Java 23+ moderno y legible
+- CLI integrado: Herramienta de línea de comandos para transpilar, compilar y ejecutar
+- Parser ANTLR4: Análisis sintáctico robusto y profesional
 
-- **Sintaxis funcional**: Tipos algebraicos, funciones y pattern matching
-- **Transpilación a Java**: Genera código Java 23+ moderno y legible
-- **CLI integrado**: Herramienta de línea de comandos para transpilar, compilar y ejecutar
-- **Parser ANTLR4**: Análisis sintáctico robusto y profesional
+## ✅ Prerrequisitos
 
-### Ejemplo de Código
+### 1. Instalar Java JDK 23+ Descargar desde https://www.oracle.com/java/technologies/downloads/
 
-```expresso
-// Números naturales
-data nat = {
-    Zero,
-    S(nat)
-}
-
-fun sum(x:nat, y:nat) = match x with
-    Zero -> y
-    S(z) -> S(sum(z, y))
+Verificar instalación: 
+``` bash
+java --version javac --version
 ```
 
-Se transpila a Java como:
-
-```java
-sealed interface Nat permits Zero, S {}
-record Zero() implements Nat {}
-record S(Nat pred) implements Nat {}
-
-static Nat sum(Nat x, Nat y) {
-    return switch (x) {
-        case Zero z -> y;
-        case S(var pred) -> new S(sum(pred, y));
-    };
-}
+Salida esperada: 
+```bash
+java 23.0.1 2024-10-15 javac 23.0.1
 ```
 
-## Prerrequisitos
-
-### Software Requerido
-
-1. Instalar Java JDK 23+
-   Descargar desde https://www.oracle.com/java/technologies/downloads/
-
-Verificar instalación:
-java --version
-javac --version
-
-Salida esperada:
-java 23.0.1 2024-10-15
-javac 23.0.1
-
----
-
-### Configuración de Variables de Entorno (Windows)
-
-#### Configurar Variables del Sistema
+### 2. Configuración de Variables de Entorno (Windows)
 
 1. **Abrir Configuración de Variables:**
-    - Presionar `Win + R`, escribir `sysdm.cpl` y presionar Enter
-    - Ir a la pestaña "Avanzado" → Clic en "Variables de entorno"
-
+   - Presionar Win + R, escribir sysdm.cpl y presionar Enter
+   - Ir a la pestaña "Avanzado" → Clic en "Variables de entorno"
+  
 2. **Crear JAVA_HOME:**
-    - En "Variables del sistema" clic en "Nueva..."
-    - Nombre de variable: `JAVA_HOME`
-    - Valor de variable: `C:\Program Files\Java\jdk-23` (ajustar según tu instalación)
-    - Clic "Aceptar"
-
+   - En "Variables del sistema" clic en "Nueva...
+   - Nombre de variable: JAVA_HOME
+   - Valor de variable: C:\Program Files\Java\jdk-23 (ajustar según tu instalación)
+   - Clic "Aceptar"
+  
 3. **Actualizar PATH:**
-    - En "Variables del sistema" seleccionar `Path` y clic "Editar..."
-    - Clic "Nueva" y agregar: `%JAVA_HOME%\bin`
-    - Clic "Aceptar" en todas las ventanas
-
+   - En "Variables del sistema" seleccionar Path y clic "Editar..."
+   - Clic "Nueva" y agregar: %JAVA_HOME%\bin
+   - Clic "Aceptar" en todas las ventanas
+  
 4. **Aplicar Cambios:**
-    - Cerrar todas las ventanas con "Aceptar"
-    - **Importante:** Cerrar y abrir nuevamente la terminal/cmd
+   - Cerrar todas las ventanas con "Aceptar"
+   - Importante: Cerrar y abrir nuevamente la terminal/cmd
 
-### Verificar Instalación
+## ⚙️ Comandos Disponibles
 
-**Abrir cmd (Command Prompt) como administrador y ejecutar:**
+🔄 `transpile`
 
-```cmd
-java --version
-javac --version
+Genera código Java desde un archivo .expresso
+- Crea el archivo .java equivalente a partir del código .expresso
+- Realiza verificación de tipos estática
+- Genera el código Java listo para compilar
+- Salida: Archivo .java en el directorio especificado
+
+🔨 `build`
+
+Compila el código Java generado
+- Ejecuta automáticamente el comando transpile primero
+- Compila el archivo .java generado
+- Crea el archivo .class (bytecode Java)
+- Salida: Archivo .class listo para ejecutar
+
+▶️ `run`
+
+Ejecuta el programa compilado
+- Ejecuta automáticamente los comandos transpile y build
+- Ejecuta el programa Java resultante
+- Salida: Ejecución del programa en consola
+
+
+## 🛠️ Explicación del Archivo .bat
+
+El archivo expressor.bat es el corazón del proyecto y maneja automáticamente todo el proceso:
+
+### 🔧 Funcionalidades Automatizadas
+
+#### 1. Gestión de ANTLR Automática
+
+- Usa la librería ANTLR 4.13.2 incluida en lib/antlr-4.13.2-complete.jar
+- Genera el parser automáticamente cuando es necesario
+- Verifica si hay cambios en la gramática para regenerar solo cuando es requerido
+
+#### 2. Compilación Inteligente
+
+- Compila el transpilador solo si hay cambios en el código fuente
+- Maneja las dependencias de classpath automáticamente
+- Detecta archivos modificados para evitar recompilaciones innecesarias
+
+#### 3. Proceso de Transpilación en 3 Fases
+
+## 📊 Proceso Detallado del Comando `transpile`
+
+``` bash
+[1/3] Generando parser ANTLR...
+    ↓ (Solo si es necesario)
+[2/3] Compilando transpilador...
+    ↓ (Solo si hay cambios)
+[3/3] Ejecutando transpilación...
+    ↓
+FASE TYPING: TyperVisitor visita AST
+    ├── Si hay errores → termina con código 1
+    └── Si no hay errores → genera .typings y continúa
+    ↓
+FASE CODEGEN: CodeGenVisitor genera .java
+```
+## 🔄 Lógica de Reconstrucción Inteligente
+
+El script incluye detección inteligente de cambios:
+
+- Parser ANTLR: Se regenera solo si la gramática (Expr.g4) es más reciente que los archivos del parser existentes
+- Transpilador: Se recompila solo si los archivos .java en src/ son más recientes que las clases compiladas
+- Evita trabajo redundante: No regenera/recompila si no hay cambios
+
+## 📁 Estructura del Proyecto
+
+``` bash
+├── 📁 bin/                                # Clases compiladas del transpilador (automático)
+├── 📁 grammar
+│   └── 📄 Expr.g4                         # Gramática del lenguaje .expresso
+├── 📁 generated/                          # Parser generado por ANTLR (automático)
+├── 📁 lib                                 # Librería ANTLR incluida
+│   └── 📄 antlr-4.13.2-complete.jar
+├── 📁 src                                 # Código fuente del transpilador
+│   ├── ☕ CodeGen.java
+│   ├── ☕ CodeGenVisitor.java
+│   ├── ☕ DataTypeGenerator.java
+│   ├── ☕ DataVisitor.java
+│   ├── ☕ Main.java
+│   ├── ☕ ScopeManager.java
+│   └── ☕ TyperVisitor.java
+├── 📁 test
+│   ├── 📁 Earth
+│   │   ├── 📄 HelloWorld0.expresso
+│   │   ├── 📄 HelloWorld1.expresso
+│   │   └── 📄 HelloWorld2.expresso
+│   ├── 📁 Mars
+│   │   └── 📄 HelloWorldMars0.expresso
+│   └── 📁 Moon
+│       └── 📄 HelloWorldMoon0.expresso
+├── ⚙️ .gitignore
+├── 📝 README.md
+└── 📄 expressor.bat                       # Script principal (este archivo)
 ```
 
-**Salidas esperadas:**
+## 🚀 Uso Rápido
 
-```cmd
-C:\> java --version
-java 23.0.1 2024-10-15
-Java(TM) SE Runtime Environment (build 23.0.1+11-39)
-Java HotSpot(TM) 64-Bit Server VM (build 23.0.1+11-39, mixed mode, sharing)
+El transpilador se ejecuta desde la línea de comandos utilizando el *script* `expressor.bat`.
 
-```
+| Comando | Descripción |
+| :--- | :--- |
+| `expressor transpile --out directorio_salida archivo.expresso` | **Transpila** a código Java (`.java`). |
+| `expressor build --out directorio_salida archivo.expresso` | Transpila y **Compila** a bytecode Java (`.class`). |
+| `expressor run --out directorio_salida archivo.expresso` | Transpila, Compila y **Ejecuta** el programa. |
 
-### Solución de Problemas de Instalación
+## 💡 Ejemplo de Uso Completo
 
-**Si aparece error "'java' no se reconoce como comando":**
-- Verificar que JAVA_HOME apunte a la carpeta correcta del JDK
-- Verificar que `%JAVA_HOME%\bin` esté en PATH
-- Cerrar y abrir nueva terminal
+```bash
+# Transpilar un archivo ejemplo.expresso
+expressor transpile --out ./salida ejemplo.expresso
 
+# Esto generará: ./salida/ejemplo.java
 
-## Uso desde la línea de comandos (Windows CMD)
+# Compilar el Java generado
+expressor build --out ./salida ejemplo.expresso
 
-El archivo `expressor.bat` permite realizar todas las acciones del compilador.
+# Esto generará: ./salida/ejemplo.class
 
----
+# Ejecutar el programa
+expressor run --out ./salida ejemplo.expresso
 
-### 1. Transpilar
-
-.\expressor transpile --out generated examples\HelloWorld.expresso
-
-.\expressor transpile --out generated test\HelloWorld0.expresso
-.\expressor transpile --out generated test\HelloWorld1.expresso
-
----
-
-### 2. Compilar
-
-.\expressor build --out output examples\HelloWorld.expresso
-
----
-
-### 3. Ejecutar
-
-.\expressor run --out output examples\HelloWorld.expresso
-
----
-
-## Ejemplo de Código Expresso
-
-examples/HelloWorld1.expresso
----------------------------------
-let a = 2
-let b = 3
-let c = 4
-
-let expr1 = a + b ** c
-print(expr1)
-
-let expr2 = a ** b ** c
-print(expr2)
-
-let complexLambda = x -> y -> x + y * 2
-let partial = complexLambda(5)
-print(partial(3))
-
-let score = 85
-let grade = score >= 90 ? "A" : score >= 80 ? "B" : "C"
-print(grade)
-
-Salida Esperada:
-83
-2417851639229258349412352
-11
-B
-
----
-
-examples/HelloWorld0.expresso
----------------------------------
-let add = (x, y) -> x + y
-print(add(5, 3))
-
-let makeAdder = x -> (y -> x + y)
-let add5 = makeAdder(5)
-print(add5(10))
-
-Salida:
-8
-15
-
----
-
-## Componentes del Sistema
-
-### 1. Parser (ANTLR4)
-- Análisis léxico y sintáctico del código Expresso
-- Generación del Abstract Syntax Tree (AST)
-- Manejo de errores sintácticos
-
-### 2. Minityper (Análisis Semántico)
-- Verificación de tipos
-- Validación de patrones de matching
-- Detección de errores semánticos
-
-### 3. Generador de Código
-- Transpilación de AST a código Java
-- Optimizaciones básicas
-- Preservación de semántica funcional
-
-### 4. CLI Tool
-- Interfaz unificada para todas las operaciones
-- Integración con herramientas Java estándar
-- Manejo de archivos y directorios
-
-## Desarrollo
-
-### Configuración del Entorno de Desarrollo
-
-1. **IDE Recomendado**: IntelliJ IDEA o Eclipse con soporte Maven
-2. **Plugins útiles**:
-    - ANTLR4 Plugin para desarrollo de gramáticas
-    - Maven Integration
-
-## Contribución
-
-### Proceso de Desarrollo
-
-1. Crear rama para nueva funcionalidad
-2. Implementar cambios con tests
-3. Verificar que todos los tests pasan
-4. Hacer commit con mensajes descriptivos
-5. Crear pull request para revisión
-
-### Estándares de Código
-
-- Seguir convenciones Java estándar
-- Documentar funciones públicas con Javadoc
-- Mantener cobertura de tests > 80%
-- Usar nombres descriptivos para variables y métodos
-
-## Apoyo de IA
-Se adjuntan conversaciones con ChatGPT que sirvieron de apoyo para el desarrollo del proyecto:
-
-
-## Cronograma del Proyecto
-
-| Entregable | Valor | Fecha Límite | Descripción |
-|------------|-------|--------------|-------------|
-| **Inicial** | 5% | 31/08/2025 12:00 | CLI básico con mocks de transpilación |
-| **Mediano** | 15% | 05/10/2025 12:00 | Parser ANTLR4 + Minityper + Tests |
-| **Final** | 20% | 16/11/2025 12:00 | Sistema completo con generación de código |
-
-## Evaluación
-
-### Criterios de Calificación
-
-- **Función (65%)**: Funcionalidad correcta, casos de prueba, capacidad de defensa
-- **Paradigma (35%)**: Uso apropiado del paradigma, calidad del código, estilo DRY
-
-### Requisitos de Entrega
-
-- Código fuente completo en repositorio Git
-- Documentación técnica actualizada
-- Batería completa de casos de prueba
-- Demo funcional en clase
-
-### Información del Curso
-
-- **Profesor**: Carlos Loría-Sáenz (loriacarlos@gmail.com)
-- **Curso**: EIF400-II-2025 - Paradigmas de Programación
-- **Institución**: Escuela de Informática, UNA
-
-## Apoyo de IA
-Se adjuntan conversaciones con ChatGPT que sirvieron de apoyo para el desarrollo del proyecto:
-https://chatgpt.com/c/68e0245b-283c-832f-87e7-afd2bbb3f30a
-
-## Licencia
-
-Proyecto académico para fines educativos únicamente.
-
----
-
-**Nota**: Este es un proyecto ágil sujeto a refinamientos y evoluciones según el avance del curso. Consultar regularmente por actualizaciones y cambios en los requerimientos.
+# Esto ejecutará el programa completo
