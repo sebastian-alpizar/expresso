@@ -35,7 +35,7 @@ public class Main {
 
         ParseTree tree = parser.program();
         
-         // ===============================
+        // ===============================
         // FASE DE TYPING
         // ===============================
         String baseName = Paths.get(inPath).getFileName().toString();
@@ -50,8 +50,14 @@ public class Main {
             System.exit(1);
         }
 
-        // Generar archivo .typings
-        Path typingsFile = Paths.get(outDir).resolve(baseName + ".expresso.typings");
+        // Crear directorio de salida si no existe
+        Path outDirectory = Paths.get(outDir);
+        if (!Files.exists(outDirectory)) {
+            Files.createDirectories(outDirectory);
+        }
+
+        // Generar archivo .typings en el directorio de salida
+        Path typingsFile = outDirectory.resolve(baseName + ".expresso.typings");
         typer.generateTypingsFile(typingsFile.toString());
         System.out.println("Generated: " + typingsFile.toAbsolutePath());
 
@@ -66,13 +72,7 @@ public class Main {
                             gen.getMainBody() + 
                             CodeGen.footer();
 
-        // Crear directorio de salida si no existe
-        Path outDirectory = Paths.get(outDir);
-        if (!Files.exists(outDirectory)) {
-            Files.createDirectories(outDirectory);
-        }
-
-        // Escribir archivo Java generado
+        // Escribir archivo Java generado en el directorio de salida
         Path outFile = outDirectory.resolve(baseName + ".java");
         Files.writeString(outFile, javaSource);
         

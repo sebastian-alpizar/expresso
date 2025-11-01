@@ -7,10 +7,13 @@ setlocal enabledelayedexpansion
 set ROOT_DIR=%~dp0
 set ANTLR_JAR=%ROOT_DIR%lib\antlr-4.13.2-complete.jar
 set GRAMMAR=%ROOT_DIR%grammar\Expr.g4
-set PARSER_OUT=%ROOT_DIR%generated
+:: Carpeta para archivos generados por ANTLR:
+set "PARSER_OUT=%ROOT_DIR%generated"
 set TRANSPILER_SRC=%ROOT_DIR%src
 set TRANSPILER_BIN=%ROOT_DIR%bin
 set EXPRESSOR_MAIN=Main
+
+echo PARSER_OUT=%PARSER_OUT%
 
 :: ===============================
 :: Verificar que el jar de ANTLR existe
@@ -103,6 +106,7 @@ if "%1"=="transpile" (
     :: ===============================
     echo [3/3] Ejecutando transpilacion...
 
+    :: Pasar el directorio de salida al programa Java
     java -cp "%ANTLR_JAR%;%TRANSPILER_BIN%;." %EXPRESSOR_MAIN% %*
     goto :eof
 
@@ -113,14 +117,16 @@ if "%1"=="transpile" (
     set "SOURCE_FILE=%~4"
     for %%I in ("%SOURCE_FILE%") do set "BASE_NAME=%%~nI"
 
-    set "JAVA_FILE=%~3\!BASE_NAME!.java"
+    set "OUT_DIR=%~3"
+    set "JAVA_FILE=%OUT_DIR%\!BASE_NAME!.java"
+    
     echo Compilando !JAVA_FILE!...
-    javac -d "%TRANSPILER_BIN%" "!JAVA_FILE!"
+    javac -cp "." -d "%OUT_DIR%" "!JAVA_FILE!"
     if errorlevel 1 (
         echo [ERROR] Error compilando !JAVA_FILE!
         exit /b 1
     )
-    echo Compilacion exitosa: %TRANSPILER_BIN%\!BASE_NAME!.class
+    echo Compilacion exitosa: %OUT_DIR%\!BASE_NAME!.class
     goto :eof
 
 :run
@@ -129,9 +135,10 @@ if "%1"=="transpile" (
 
     set "SOURCE_FILE=%~4"
     for %%I in ("%SOURCE_FILE%") do set "BASE_NAME=%%~nI"
+    set "OUT_DIR=%~3"
 
     echo Ejecutando !BASE_NAME!...
-    java -cp "%TRANSPILER_BIN%;." !BASE_NAME!
+    java -cp "%OUT_DIR%;." !BASE_NAME!
     goto :eof
 
 :eof

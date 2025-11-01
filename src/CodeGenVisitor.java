@@ -1,11 +1,12 @@
 import java.util.*;
-// import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.ParserRuleContext;
 
 public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private final ScopeManager scopeManager = new ScopeManager();
     private StringBuilder mainBody = new StringBuilder();
     private StringBuilder topLevel = new StringBuilder();
     private Map<String, String> pendingLambdaParamTypes = null;
+    private final DataVisitor dataVisitor = new DataVisitor();
 
     // private String debug(String label, ParserRuleContext ctx, String result) {
     //     String text = ctx.getText().replaceAll("\\s+", " ");
@@ -29,9 +30,18 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     
     @Override
     public String visitProgram(ExprParser.ProgramContext ctx) {
+        mainBody.setLength(0);
+        topLevel.setLength(0);
+
         mainBody.append("public static void main(String[] args) {\n");
         scopeManager.enterScope(); // scope global
         for (ExprParser.StatementContext stmt : ctx.statement()) {
+            if (stmt.dataStatement() != null) {
+                dataVisitor.visit(stmt.dataStatement());
+                topLevel.append(dataVisitor.getGeneratedCode()).append("\n");
+                dataVisitor.clear(); // Limpieza obligatoria
+                continue;
+            }
             String result = visit(stmt);
             if (result != null && !result.trim().isEmpty() && !result.startsWith("public static"))
                 mainBody.append("    ").append(result).append("\n");
@@ -44,7 +54,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     @Override // ---------------- LET ----------------
     public String visitLetStatement(ExprParser.LetStatementContext ctx) {
         String varName = ctx.ID().getText();
-        String type = "int";
+        String type = "var";
         
         if (ctx.type() != null)
             type = mapType(ctx.type());
@@ -60,16 +70,12 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         
         String value = visit(ctx.expression());
         pendingLambdaParamTypes = null; // una vez visitada la expresión, limpiamos por seguridad
-        // variableTypes.put(varName, type);
 
-        String code;
         if (!scopeManager.isVarDeclared(varName)) {
             scopeManager.declareVar(varName, type);
-            code = String.format("%s %s = %s;", type, varName, value);
+            return String.format("%s %s = %s;", type, varName, value);
         } else 
-            code = String.format("%s = %s;", varName, value);
-
-        return code;
+            return String.format("%s = %s;", varName, value);
     }
 
     private Map<String,String> parseLambdaParamTypes(ExprParser.TypeContext typeCtx) {
@@ -215,8 +221,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         return code;
     }
 
-
-
     private String processLambdaBodyIfNeeded(String body, List<String> params) {
         if (scopeManager.isVarDeclared(body) && !params.isEmpty()) {
             String type = scopeManager.getVarType(body);
@@ -311,6 +315,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     @Override
     public String visitPrimaryExpression(ExprParser.PrimaryExpressionContext ctx) {
         if (ctx.functionCall() != null) return visit(ctx.functionCall());
+        if (ctx.constructorCall() != null) return visit(ctx.constructorCall());
         if (ctx.INTEGER() != null) return ctx.INTEGER().getText();
         if (ctx.FLOAT() != null) return ctx.FLOAT().getText() + "f";
         if (ctx.STRING() != null) return ctx.STRING().getText();
@@ -446,28 +451,43 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         // PRIORIDAD 1: Variables en scope (más confiable)
         if (scopeManager.isVarDeclared(exprCode)) {
             String scopedType = scopeManager.getVarType(exprCode);
-            if (scopedType != null) {
+            if (scopedType != null)
                 return normalizeType(scopedType);
-            }
         }
 
         // PRIORIDAD 2: Literales y patrones
-        if (exprCode.matches("^[0-9]+\\.[0-9]+f?$")) {
+        if (exprCode.matches("^[0-9]+\\.[0-9]+f?$"))
             return "float";
-        }
-        if (exprCode.matches("^[0-9]+$")) {
+        if (exprCode.matches("^[0-9]+$"))
             return "int";
-        }
-        if (exprCode.startsWith("\"") && exprCode.endsWith("\"")) {
+        if (exprCode.startsWith("\"") && exprCode.endsWith("\""))
             return "String";
-        }
-        if (exprCode.contains("Math.pow") || exprCode.contains("float")) {
+        if (exprCode.contains("Math.pow") || exprCode.contains("float"))
             return "float";
-        }
-        if (exprCode.matches(".*[\\+\\-\\*/].*")) {
+        if (exprCode.matches(".*[\\+\\-\\*/].*"))
             return exprCode.contains(".") || exprCode.contains("f") ? "float" : "int";
-        }
 
-        return "int";
+        return "var";
+    }
+
+    @Override
+    public String visitConstructorCall(ExprParser.ConstructorCallContext ctx) {
+        String constructorName = ctx.ID().getText();
+        List<String> args = new ArrayList<>();
+        
+        // Procesar argumentos si existen
+        if (ctx.expression() != null)
+            for (ExprParser.ExpressionContext expr : ctx.expression()) {
+                args.add(visit(expr));
+            }
+        
+        String code;
+        // Siempre incluir paréntesis, incluso para constructores sin argumentos
+        if (args.isEmpty())
+            code = String.format("new %s()", constructorName);
+        else
+            code = String.format("new %s(%s)", constructorName, String.join(", ", args));
+
+        return code;
     }
 }

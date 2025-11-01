@@ -6,6 +6,7 @@ statement
     : letStatement
     | funStatement
     | printStatement
+    | dataStatement 
     | expression
     ;
 
@@ -88,7 +89,8 @@ unaryExpression
     ;
 
 primaryExpression
-    : functionCall
+    : constructorCall
+    | functionCall
     | FLOAT
     | INTEGER
     | STRING
@@ -96,8 +98,46 @@ primaryExpression
     | '(' expression ')'
     ;
 
+constructorCall
+    : '^' ID '(' (expression (',' expression)*)? ')'
+    | '^' ID
+    ;
+
 functionCall
     : ID '(' (expression (',' expression)*)? ')'
+    ;
+
+dataStatement
+    : 'data' ID '=' '{' constructorList '}'
+    ;
+
+constructorList
+    : constructor (',' constructor)*
+    ;
+
+constructor
+    : ID arguments?
+    ;
+
+arguments
+    : '(' argument (',' argument)* ')'
+    ;
+
+argument
+    : (ID ':')? flatType
+    ;
+
+// flatType es como un "tipo base" (no anidado), por ejemplo int, string, (int->int)
+flatType
+    : 'int'
+    | 'float'
+    | 'string'
+    | ID
+    | '(' flatTypeList '->' flatType ')'
+    ;
+
+flatTypeList
+    : flatType (',' flatType)*
     ;
 
 ID: [a-zA-Z_][a-zA-Z0-9_]*;

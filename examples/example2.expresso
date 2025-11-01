@@ -1,0 +1,16 @@
+// Números naturales
+data nat = {
+Zero,
+S(n:nat)
+}
+// Listas tipo Scheme/Prolog
+data list = {
+Nil,
+Cons(car:any, cdr:list)
+}
+// Simulando un enum
+data gender = {
+Male, Female
+}
+
+let my_list = ^Cons(666, ^Nil)
