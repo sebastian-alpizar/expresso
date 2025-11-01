@@ -43,8 +43,42 @@ printStatement
 
 expression
     : lambdaExpression
+    | matchExpression
+    | constructorExpr
     | ternaryExpression
     | additiveExpression
+    ;
+
+constructorExpr
+    : '^' ID ('(' expressionList? ')')?
+    ;
+
+expressionList
+    : expression (',' expression)*
+    ;
+
+matchExpression
+    : 'match' expression 'with' matchRule ('|' matchRule)* 
+    ;
+
+matchRule
+    : pattern ('when' expression)? '->' expression
+    ;
+
+pattern
+    : dataPattern
+    | nativePattern
+    ;
+
+dataPattern
+    : ID ('(' pattern (',' pattern)* ')')?
+    ;
+
+nativePattern
+    : 'none'
+    | STRING
+    | INTEGER
+    | FLOAT
     ;
 
 ternaryExpression
@@ -89,18 +123,12 @@ unaryExpression
     ;
 
 primaryExpression
-    : constructorCall
-    | functionCall
+    : functionCall
     | FLOAT
     | INTEGER
     | STRING
     | ID
     | '(' expression ')'
-    ;
-
-constructorCall
-    : '^' ID '(' (expression (',' expression)*)? ')'
-    | '^' ID
     ;
 
 functionCall

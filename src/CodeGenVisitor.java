@@ -1,5 +1,5 @@
 import java.util.*;
-import org.antlr.v4.runtime.ParserRuleContext;
+// import org.antlr.v4.runtime.ParserRuleContext;
 
 public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private final ScopeManager scopeManager = new ScopeManager();
@@ -7,6 +7,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private StringBuilder topLevel = new StringBuilder();
     private Map<String, String> pendingLambdaParamTypes = null;
     private final DataVisitor dataVisitor = new DataVisitor();
+    private final MatchVisitor matchVisitor = new MatchVisitor(this);
 
     // private String debug(String label, ParserRuleContext ctx, String result) {
     //     String text = ctx.getText().replaceAll("\\s+", " ");
@@ -132,8 +133,19 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                     return String.format("Supplier<%s>", mapTypeName(returnType));
             }
 
-            // Si NO hay tipos explícitos, seguimos usando el comportamiento antiguo
             int paramCount = getLambdaParamCount(lambda.lambdaParams());
+            String bodyText = lambda.expression().getText();
+
+            if (bodyText.contains("match")) {
+                // Detecta una lambda con un 'match' pattern -> necesita un tipo más genérico
+                if (paramCount == 1)
+                    return "Function<List, Object>";
+                else if (paramCount == 2)
+                    return "BiFunction<Object, Object, Object>";
+                else
+                    return "Supplier<Object>";
+            }
+            // Caso genérico (sin match)
             return (paramCount == 1 ? "UnaryOperator<Integer>" : "BinaryOperator<Integer>");
         }
 
@@ -315,7 +327,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     @Override
     public String visitPrimaryExpression(ExprParser.PrimaryExpressionContext ctx) {
         if (ctx.functionCall() != null) return visit(ctx.functionCall());
-        if (ctx.constructorCall() != null) return visit(ctx.constructorCall());
         if (ctx.INTEGER() != null) return ctx.INTEGER().getText();
         if (ctx.FLOAT() != null) return ctx.FLOAT().getText() + "f";
         if (ctx.STRING() != null) return ctx.STRING().getText();
@@ -351,9 +362,13 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     public String visitExpression(ExprParser.ExpressionContext ctx) {
         if (ctx.lambdaExpression() != null)
             return visit(ctx.lambdaExpression());
-        else if (ctx.ternaryExpression() != null)
+        if (ctx.matchExpression() != null)
+            return matchVisitor.visit(ctx.matchExpression());
+        if (ctx.constructorExpr() != null)
+            return visit(ctx.constructorExpr());
+        if (ctx.ternaryExpression() != null)
             return visit(ctx.ternaryExpression());
-        else if (ctx.additiveExpression() != null)
+        if (ctx.additiveExpression() != null)
             return visit(ctx.additiveExpression());
         return visitChildren(ctx);
     }
@@ -471,23 +486,20 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
 
     @Override
-    public String visitConstructorCall(ExprParser.ConstructorCallContext ctx) {
-        String constructorName = ctx.ID().getText();
-        List<String> args = new ArrayList<>();
-        
-        // Procesar argumentos si existen
-        if (ctx.expression() != null)
-            for (ExprParser.ExpressionContext expr : ctx.expression()) {
-                args.add(visit(expr));
-            }
-        
-        String code;
-        // Siempre incluir paréntesis, incluso para constructores sin argumentos
-        if (args.isEmpty())
-            code = String.format("new %s()", constructorName);
-        else
-            code = String.format("new %s(%s)", constructorName, String.join(", ", args));
+    public String visitConstructorExpr(ExprParser.ConstructorExprContext ctx) {
+        String name = capitalize(ctx.ID().getText());
 
-        return code;
+        if (ctx.expressionList() == null)
+            return "new " + name + "()";
+
+        List<String> args = new ArrayList<>();
+        for (ExprParser.ExpressionContext e : ctx.expressionList().expression()) {
+            args.add(visit(e));
+        }
+        return "new " + name + "(" + String.join(", ", args) + ")";
+    }
+
+    private String capitalize(String s) {
+        return s.substring(0, 1).toUpperCase() + s.substring(1);
     }
 }

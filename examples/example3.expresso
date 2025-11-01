@@ -1,0 +1,10 @@
+data List = { Nil, Cons(head:int, tail:List) }
+
+let my_list = ^Cons(666, ^Nil)
+
+let first = a -> match a with
+    Nil -> "none"
+    | Cons(f, _) -> f
+
+print(first(my_list))
+print(first(^Nil))
