@@ -1,0 +1,6 @@
+let PI:float = 3.14
+let x = 666 // lo mismo que let x:int = 666
+fun cat(s:string, t:string):string = s + t
+let my_pow:((float, int) -> float) = (x, n) -> x ** n
+let another_my_pow = (x:float, n:float) -> x ** n
+fun fact(n:int):int = n ? n * fact(n - 1) : 1
