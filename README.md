@@ -145,12 +145,13 @@ El script incluye detección inteligente de cambios:
 │   └── 📄 antlr-4.13.2-complete.jar
 ├── 📁 src                                 # Código fuente del transpilador
 │   ├── ☕ CodeGen.java
-│   ├── ☕ CodeGenVisitor.java
-│   ├── ☕ DataTypeGenerator.java
-│   ├── ☕ DataVisitor.java
+│   ├── ☕ CodeGenVisitor.java             # Clase principal orquestadora
+│   ├── ☕ DataTypeGenerator.java          # Genera estructuras de datos (Data)
+│   ├── ☕ DataVisitor.java                # Visita y procesa específicamente las declaraciones data
 │   ├── ☕ Main.java
-│   ├── ☕ ScopeManager.java
-│   └── ☕ TyperVisitor.java
+│   ├── ☕ MatchVisitor.java               # Implementa el manejo de match o patrones (pattern matching)
+│   ├── ☕ ScopeManager.java               # Maneja los alcances de variables y funciones (scope)
+│   └── ☕ TyperVisitor.java               # Verificación de tipos
 ├── 📁 test
 │   ├── 📁 Earth
 │   │   ├── 📄 HelloWorld0.expresso
