@@ -1,0 +1,5 @@
+let condition = true;
+let result1 = condition ? "hello" : "world";        // → String result1
+let result2 = condition ? 1 : 0;                    // → int result2  
+let result3 = condition ? 1.5 : 2;                  // → float result3
+let result5 = condition ? true : false;             // → boolean result5
