@@ -63,7 +63,7 @@ Ejecuta:
 powershell
 [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "Machine") + ";C:\Users\tu-usuario\Downloads\expresso", "Machine")
 ```
-Reemplaza `C:\Users\tu-usuario\Downloads\expresso` por el directorio en donde tienes el proyecto para ubicar el archivo .bat
+Reemplaza `C:\Users\tu-usuario\Downloads\expresso` por el directorio en donde tienes el proyecto para ubicar el archivo .bat al sistema
 
 ## ⚙️ Comandos Disponibles
 
