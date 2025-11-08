@@ -14,6 +14,9 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private StringBuilder topLevel = new StringBuilder();
     private Map<String, String> pendingLambdaParamTypes = null;
 
+    private boolean needsPrintFunction = false;
+    private boolean insideLetAssignment = false; // Nuevo flag para detectar contexto
+
     /* ================================================================
         2. GESTIÓN DE LAMBDAS TOP-LEVEL Y RECURSIVAS
     ================================================================ */
@@ -129,16 +132,22 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 continue;
             }
             String result = visit(stmt);
-            if (result != null && !result.trim().isEmpty() && !result.startsWith("public static"))
+            if (result != null && !result.trim().isEmpty() && !result.startsWith("public static")) {
+                // Si el resultado NO termina con ;, agregarlo (para statements)
+                if (!result.trim().endsWith(";")) {
+                    result = result + ";";
+                }
                 mainBody.append("    ").append(result).append("\n");
+            }
         }
         scopeManager.exitScope();
         mainBody.append("}\n");
         return mainBody.toString();
     }
-        
+    
     @Override
     public String visitLetStatement(ExprParser.LetStatementContext ctx) {
+        insideLetAssignment = true; // Estamos dentro de una asignación let
         String varName = ctx.ID().getText();
         String type = "var";
 
@@ -147,6 +156,10 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         else
             type = inferType(ctx.expression());
         type = normalizeType(type);
+
+        // Detectar si la expresión es un print statement
+        if (ctx.expression().printStatement() != null)
+            needsPrintFunction = true;
 
         pendingLambdaParamTypes = (ctx.expression().lambdaExpression() != null && ctx.type() != null)
                 ? parseLambdaParamTypes(ctx.type())
@@ -172,17 +185,20 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 topLevel.append(methodCode).append("\n");
                 registerTopLevelLambda(varName, "method");
                 scopeManager.declareVar(varName, inferType(ctx.expression()));
+                insideLetAssignment = false;
                 return ""; // no declarar dentro del main
             } else {
                 // Si YA es una lambda top-level, NO generar en el main
                 if (isTopLevelLambda(varName)) {
                     scopeManager.declareVar(varName, type);
+                    insideLetAssignment = false;
                     return ""; // ya existe en top-level, no redeclarar
                 }
 
                 // Caso normal (lambda no recursiva)
                 String value = visit(lambda);
                 pendingLambdaParamTypes = null;
+                insideLetAssignment = false; // Salir del contexto de asignación
                 if (!scopeManager.isVarDeclared(varName)) {
                     scopeManager.declareVar(varName, type);
                     return String.format("%s %s = %s;", type, varName, value);
@@ -194,6 +210,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         // --- Caso general (no lambda) ---
         String value = visit(ctx.expression());
         pendingLambdaParamTypes = null;
+        insideLetAssignment = false;
 
         if (!scopeManager.isVarDeclared(varName)) {
             scopeManager.declareVar(varName, type);
@@ -219,6 +236,9 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 scopeManager.declareVar(paramName, paramType); // <- Declaramos los parámetros aquí
             }
 
+        System.out.println("DEBUG funStatement: " + ctx.getText());
+        System.out.println("  expression: " + (ctx.expression() != null ? ctx.expression().getText() : "null"));
+
         String body = visit(ctx.expression());
         scopeManager.exitScope(); // <- Cerrar scope de parámetros
         String functionCode = String.format("public static %s %s(%s) { return %s; }",
@@ -231,7 +251,11 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     @Override
     public String visitPrintStatement(ExprParser.PrintStatementContext ctx) {
         String value = visit(ctx.expression());
-        return String.format("System.out.println(%s);", value);
+        if (insideLetAssignment) {
+            needsPrintFunction = true; // Asegurar que se genere la función
+            return String.format("print(%s)", value);
+        } else
+            return String.format("System.out.println(%s);", value);
     }
 
     /* ================================================================
@@ -240,21 +264,33 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
     @Override
     public String visitExpression(ExprParser.ExpressionContext ctx) {
+        // Guardar el estado anterior
+        boolean previousInsideLet = insideLetAssignment;
+        String result;
+        
+        // Si no estamos ya en un let, resetear el flag para expresiones anidadas
+        if (!insideLetAssignment) insideLetAssignment = false;
+
         if (ctx.ternaryExpression() != null)
-            return visit(ctx.ternaryExpression());
-        if (ctx.logicalOrExpression() != null)
-            return visit(ctx.logicalOrExpression());
-        if (ctx.additiveExpression() != null)
-            return visit(ctx.additiveExpression());
-        if (ctx.lambdaExpression() != null)
-            return visit(ctx.lambdaExpression());
-        if (ctx.matchExpression() != null)
-            return matchVisitor.visit(ctx.matchExpression());
-        if (ctx.constructorExpr() != null)
-            return visit(ctx.constructorExpr());
-        if (ctx.castExpression() != null)       
-            return visit(ctx.castExpression());
-        return visitChildren(ctx);
+            result = visit(ctx.ternaryExpression());
+        else if (ctx.logicalOrExpression() != null)
+            result = visit(ctx.logicalOrExpression());
+        else if (ctx.additiveExpression() != null)
+            result = visit(ctx.additiveExpression());
+        else if (ctx.lambdaExpression() != null)
+            result = visit(ctx.lambdaExpression());
+        else if (ctx.matchExpression() != null)
+            result = matchVisitor.visit(ctx.matchExpression());
+        else if (ctx.constructorExpr() != null)
+            result = visit(ctx.constructorExpr());
+        else if (ctx.castExpression() != null)       
+            result = visit(ctx.castExpression());
+        else
+            result = visitChildren(ctx);
+        
+        // Restaurar el estado
+        insideLetAssignment = previousInsideLet;
+        return result;
     }
 
     @Override
@@ -415,7 +451,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         }
         // CASO 2: El cuerpo ES una expresión lambda - NO aplicar .apply() aquí
         // Solo debemos aplicar parámetros si el cuerpo es una variable función, no si es una lambda literal
-        if (body.contains("->") && !params.isEmpty()) {
+        if (body != null && body.contains("->") && !params.isEmpty()) {
             // En este caso, la lambda ya está correcta, no necesitamos aplicar .apply()
             // Por ejemplo: para "x -> z -> ...", el cuerpo "z -> ..." ya es correcto
             return body;
@@ -436,8 +472,14 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         if (result == null || result.isEmpty())
             result = ctx.primaryTarget().getText();
 
-        boolean isDeclaredFunction = scopeManager.isVarDeclared(result)
-                && scopeManager.getVarType(result).matches("Function<.*>|BiFunction<.*>|UnaryOperator<.*>|BinaryOperator<.*>");
+        boolean isDeclaredFunction = scopeManager.isVarDeclared(result);
+        String varType = isDeclaredFunction ? scopeManager.getVarType(result) : "";
+        
+        // DETECTAR TIPOS ESPECÍFICOS
+        boolean isConsumer = varType.startsWith("Consumer<") || varType.startsWith("BiConsumer<");
+        boolean isFunction = varType.startsWith("Function<") || varType.startsWith("BiFunction<") || 
+                            varType.startsWith("UnaryOperator<") || varType.startsWith("BinaryOperator<");
+        
         boolean isTopLevel = isTopLevelLambda(result);
         boolean isMethod = isTopLevel && isTopLevelMethod(result);
         boolean isField = isTopLevel && isTopLevelField(result);
@@ -449,16 +491,21 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             }
             String argsStr = String.join(", ", args);
 
-            if ((isDeclaredFunction && !isMethod) || isField) {
-                // Lambdas o campos estáticos => usan apply()
-                if (args.size() == 1)
-                    result = String.format("%s.apply(%s)", result, argsStr);
-                else if (args.size() == 2)
-                    result = String.format("%s.apply(%s, %s)", result, args.get(0), args.get(1));
-                else
-                    result = String.format("%s.apply(%s)", result, argsStr);
-            } else  // Métodos estáticos => se invocan directo
+            // NUEVA LÓGICA: Primero verificar si es Consumer
+            if (isConsumer) {
+                // Consumers usan .accept()
+                result = String.format("%s.accept(%s)", result, argsStr);
+            } 
+            // Luego verificar si es Function declarada o campo
+            else if ((isDeclaredFunction && isFunction && !isMethod) || isField) {
+                // Functions usan .apply()
+                result = String.format("%s.apply(%s)", result, argsStr);
+            } 
+            // Finalmente, si es método estático o función no declarada
+            else {
+                // Métodos estáticos => se invocan directo
                 result = String.format("%s(%s)", result, argsStr);
+            }
         }
 
         return result;
@@ -506,6 +553,8 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         if (ctx.STRING() != null) return ctx.STRING().getText();
         if (ctx.ID() != null) return ctx.ID().getText();
         if (ctx.booleanLiteral() != null) return visit(ctx.booleanLiteral());
+        if (ctx.noneLiteral() != null) return visit(ctx.noneLiteral());
+        if (ctx.printStatement() != null) return visit(ctx.printStatement());
         if (ctx.expression() != null) return visit(ctx.expression());
         return "";
     }
@@ -616,6 +665,8 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         if (exprCode == null) return "int";
         exprCode = exprCode.trim();
 
+        if (exprCode.startsWith("print(")) return "Void";
+
         // PRIORIDAD 1: Variables en scope (más confiable)
         if (scopeManager.isVarDeclared(exprCode)) {
             String scopedType = scopeManager.getVarType(exprCode);
@@ -700,14 +751,18 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             case "float": return "float";
             case "int": return "int";
             case "boolean": return "boolean";
+            case "void": return "Void";
             default: return type;
         }
     }
 
     private String inferType(ExprParser.ExpressionContext expr) {
         if (expr == null) return "int";
+
+        // PASO 1: Casos específicos por tipo de expresión
+        if (expr.printStatement() != null) return "Void";
         
-        // Caso específico para expresiones ternarias
+        // Paso 2: Caso específico para expresiones ternarias
         if (expr.ternaryExpression() != null) {
             ExprParser.TernaryExpressionContext ternary = expr.ternaryExpression();
             
@@ -734,6 +789,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             return "var";
         }
         
+        // Paso 3: Caso específico para expresiones lambda
         if (expr.lambdaExpression() != null) {
             var lambda = expr.lambdaExpression();
             int paramCount = getLambdaParamCount(lambda.lambdaParams());
@@ -751,13 +807,22 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 // Inferir tipo de retorno según el cuerpo de la lambda
                 String returnType = inferType(lambda.expression());
 
-                // Generar tipo de función adecuado
+                boolean returnsVoid = returnType.equals("Void") || returnType.equals("void");
+
                 if (paramTypes.size() == 1) {
-                    return String.format("Function<%s, %s>", paramTypes.get(0), mapTypeName(returnType));
+                    if (returnsVoid)
+                        return String.format("Consumer<%s>", paramTypes.get(0));
+                    else
+                        return String.format("Function<%s, %s>", paramTypes.get(0), mapTypeName(returnType));
                 } else if (paramTypes.size() == 2) {
-                    return String.format("BiFunction<%s, %s, %s>", paramTypes.get(0), paramTypes.get(1), mapTypeName(returnType));
+                    if (returnsVoid)
+                        return String.format("BiConsumer<%s, %s>", paramTypes.get(0), paramTypes.get(1));
+                    else
+                        return String.format("BiFunction<%s, %s, %s>", paramTypes.get(0), paramTypes.get(1), mapTypeName(returnType));
                 } else {
-                    return String.format("Supplier<%s>", mapTypeName(returnType));
+                    return returnsVoid
+                            ? "Runnable"
+                            : String.format("Supplier<%s>", mapTypeName(returnType));
                 }
             }
 
@@ -788,11 +853,14 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             return (paramCount == 1 ? "UnaryOperator<Integer>" : "BinaryOperator<Integer>");
         }
 
+        // PASO 4: Verificar si es variable declarada
         String text = expr.getText();
         if (scopeManager.isVarDeclared(text)) {
             String scopedType = scopeManager.getVarType(text);
             if (scopedType != null) return scopedType;
         }
+
+        // PASO 4: Delegar a inferencia primitiva
         return inferPrimitiveType(visit(expr));
     }
 
@@ -828,6 +896,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     ================================================================ */
 
     public String getMainBody() {
+        if (needsPrintFunction) generatePrintMethod();
         return topLevel.toString() + mainBody.toString();
     }
 
@@ -843,5 +912,16 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     @Override
     public String visitLambdaParams(ExprParser.LambdaParamsContext ctx) {
         return null; // Solo recolectar los parámetros, no generar código aquí
+    }
+
+    private void generatePrintMethod() {
+        String printMethod = """
+            static Void print(Object value) {
+                System.out.println(value);
+                return null;
+            }
+            """;
+        // Insertar al principio del código top-level
+        topLevel.insert(0, printMethod + "\n");
     }
 }

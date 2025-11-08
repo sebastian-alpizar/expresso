@@ -36,7 +36,7 @@ letStatement
 // ------------------------
 
 funStatement
-    : 'fun' ID '(' paramList? ')' (':' type)? '=' expression
+    : FUN ID '(' paramList? ')' (':' type)? '=' expression
     ;
 // Ejemplo: fun add(x:int, y:int): int = x + y
 // Define una función con nombre, parámetros, tipo opcional y cuerpo
@@ -59,7 +59,9 @@ type
     : 'int'                        // Tipo entero
     | 'float'                      // Tipo flotante
     | 'string'                     // Tipo cadena
+    | 'any'
     | '(' typeList '->' type ')'   // Tipo función (int, float -> string)
+    | type '->' type
     ;
 // Ejemplo: (int, float -> string)
 
@@ -90,6 +92,7 @@ expression
     | matchExpression
     | constructorExpr
     | castExpression
+    | printStatement
     ;
 // Una expresión puede ser ternaria, lógica, aritmética, lambda, match, constructor o cast
 
@@ -137,8 +140,9 @@ expressionList
 // ------------------------
 
 matchExpression
-    : 'match' expression 'with' matchRule ('|' matchRule)* 
+    : 'match' expression 'with' '|'? matchRule ('|' matchRule)*
     ;
+
 // Ejemplo:
 // match x with
 // | Some(y) -> y
@@ -258,7 +262,17 @@ primaryExpression
     | STRING              // Literal string
     | ID                  // Identificador
     | booleanLiteral      // true / false
+    | noneLiteral
+    | printStatement      // Sentencia print como expresión
     | '(' expression ')'  // Expresión entre paréntesis
+    ;
+
+// ------------------------
+//  Literal none
+// ------------------------
+
+noneLiteral
+    : 'none'
     ;
 
 // ------------------------
@@ -330,6 +344,7 @@ flatType
     : 'int'
     | 'float'
     | 'string'
+    | 'any'
     | ID
     | '(' flatTypeList '->' flatType ')'
     ;
@@ -341,8 +356,9 @@ flatTypeList
 // Lista de tipos planos
 
 // ------------------------
-//  Tokens léxicos
+//  Palabras clave
 // ------------------------
+FUN: 'fun';
 
 ID: [a-zA-Z_][a-zA-Z0-9_]*; 
 // Identificadores: letras, números y guiones bajos, sin empezar con número

@@ -121,18 +121,33 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     public Void visitDataStatement(ExprParser.DataStatementContext ctx) {
         String typeName = ctx.ID().getText();
 
+        // Verifica redefinición del tipo
         if (symbolTable.containsKey(typeName)) {
             errors.add("Redefinición de tipo: " + typeName);
             return null;
         }
 
-        // Marca el identificador como "type"
+        // Marca el tipo como "type"
         symbolTable.put(typeName, "type");
         typings.add(typeName + ": type");
 
-        // No analiza constructores
+        // ✅ Registrar los constructores del tipo
+        if (ctx.constructorList() != null) {
+            for (ExprParser.ConstructorContext ctorCtx : ctx.constructorList().constructor()) {
+                String ctorName = ctorCtx.ID().getText();
+
+                if (symbolTable.containsKey(ctorName)) {
+                    errors.add("Redefinición de constructor: " + ctorName);
+                } else {
+                    symbolTable.put(ctorName, "constructor of " + typeName);
+                    typings.add(ctorName + ": constructor of " + typeName);
+                }
+            }
+        }
+
         return null;
     }
+
 
     // ----------------------------------------------------------
     //  Sentencia 'print'
