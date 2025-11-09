@@ -1,3 +1,11 @@
+/**
+ * @author Daniel Ramirez
+ * @author Isella Rios
+ * @author Giancarlo Arenas
+ * @author Kaleb Rojas
+ * @author Sebastian Alpizar
+ */
+
 import java.util.*;
 
 // Este visitor maneja las expresiones `match` (pattern matching).
@@ -13,12 +21,11 @@ public class MatchVisitor extends ExprBaseVisitor<String> {
         this.parent = parent;
     }
 
-    // ==========================================================
     //  Método principal: procesa una expresión `match`
-    // ==========================================================
+
     @Override
     public String visitMatchExpression(ExprParser.MatchExpressionContext ctx) {
-        // Evalúa la expresión que se va a "matchear", ej: xs
+        // Evalúa la expresión que se va a "matchear"
         String matchedExpr = parent.visit(ctx.expression());
 
         // Acumulador del código generado
@@ -35,9 +42,9 @@ public class MatchVisitor extends ExprBaseVisitor<String> {
 
             // Genera la línea "case patrón -> resultado;"
             code.append("    case ")
-                .append(visit(rule.pattern())) // visita el patrón (ej: Cons(h, t))
+                .append(visit(rule.pattern())) 
                 .append(" -> ")
-                .append(parent.visit(resultExpr)) // visita el resultado (ej: h + sum(t))
+                .append(parent.visit(resultExpr)) 
                 .append(";\n");
         }
 
@@ -46,17 +53,16 @@ public class MatchVisitor extends ExprBaseVisitor<String> {
         return code.toString();
     }
 
-    // ==========================================================
-    //  Procesa patrones que corresponden a tipos de datos (DataPattern)
-    // ==========================================================
-    @Override
-    public String visitDataPattern(ExprParser.DataPatternContext ctx) {
-        String name = ctx.ID().getText(); // Nombre del constructor, ej: Cons o Nil
 
-        // Caso 1: patrón sin argumentos, ej: Nil
+    //  Procesa patrones que corresponden a tipos de datos
+
+    public String visitDataPattern(ExprParser.DataPatternContext ctx) {
+        String name = ctx.ID().getText(); 
+
+        // Caso 1: patrón sin argumentos, 
         if (ctx.pattern().isEmpty()) return name + "()";
 
-        // Caso 2: patrón con argumentos, ej: Cons(f, _)
+        // Caso 2: patrón con argumentos
         List<String> params = new ArrayList<>();
 
         for (ExprParser.PatternContext p : ctx.pattern()) {
@@ -80,18 +86,18 @@ public class MatchVisitor extends ExprBaseVisitor<String> {
         return name + "(" + String.join(", ", params) + ")";
     }
 
-    // ==========================================================
+   
     //  Procesa patrones nativos (números, strings, none, etc.)
-    // ==========================================================
+ 
     @Override
     public String visitNativePattern(ExprParser.NativePatternContext ctx) {
-        // Caso "_" → comodín (ignora el valor)
+        // Caso "_" → patrón ignorado
         if (ctx.getText().equals("_")) return "_";
 
         // Literales enteros
         if (ctx.INTEGER() != null) return ctx.INTEGER().getText();
 
-        // Literales flotantes (agrega 'f' al final para Java)
+        // Literales flotantes 
         if (ctx.FLOAT() != null) return ctx.FLOAT().getText() + "f";
 
         // Literales de texto (cadena)

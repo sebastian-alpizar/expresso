@@ -1,3 +1,12 @@
+
+:: Daniel Ramirez
+::Isella Rios
+::Giancarlo Arenas
+::  Kaleb Rojas
+:: Sebastian Alpizar
+
+
+
 @echo off
 setlocal enabledelayedexpansion
 

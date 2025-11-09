@@ -1,3 +1,12 @@
+/**
+ * @author Daniel Ramirez
+ * @author Isella Rios
+ * @author Giancarlo Arenas
+ * @author Kaleb Rojas
+ * @author Sebastian Alpizar
+ */
+
+
 // TyperRunner.java
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -35,7 +44,7 @@ public class TyperRunner {
         typer.generateTypingsFile(outputDir);
     }
 
-    // Ejecutable por línea de comandos (opcional)
+    
     public static void main(String[] args) throws IOException {
         if (args.length < 1) {
             System.err.println("Usage: TyperRunner <file.expresso> [outputDir]");

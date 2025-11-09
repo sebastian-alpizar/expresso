@@ -1,12 +1,20 @@
+/**
+ * @author Daniel Ramirez
+ * @author Isella Rios
+ * @author Giancarlo Arenas
+ * @author Kaleb Rojas
+ * @author Sebastian Alpizar
+ */
+
 import java.util.*;
 
 // Clase que maneja los ámbitos (scopes) de variables y sus tipos.
 // Permite declarar variables, verificar si existen, y evitar colisiones de nombres.
 public class ScopeManager {
 
-    // ==========================================================
+  
     //  Clase interna que representa un solo ámbito
-    // ==========================================================
+
     private static class Scope {
         // Conjunto de nombres de variables declaradas en este ámbito
         Set<String> names = new HashSet<>();
@@ -15,10 +23,9 @@ public class ScopeManager {
         Map<String, String> types = new HashMap<>();
     }
 
-    // ==========================================================
+ 
     //  Atributos principales del ScopeManager
-    // ==========================================================
-
+ 
     // Mapa usado para evitar colisiones de nombres (ej: lambdas anidadas)
     // Guarda nombres "seguros" generados cuando hay conflictos.
     Map<String, String> safeNameMap = new HashMap<>();
@@ -29,9 +36,9 @@ public class ScopeManager {
     // Contador usado para generar nombres únicos (ej: x_1, x_2, ...)
     private int lambdaCounter = 0;
 
-    // ==========================================================
+   
     //  Manejo de entrada y salida de scopes
-    // ==========================================================
+    
 
     // Crea un nuevo ámbito y lo agrega a la pila
     public void enterScope() {
@@ -43,9 +50,9 @@ public class ScopeManager {
         if (!scopes.isEmpty()) scopes.pop();
     }
 
-    // ==========================================================
+
     //  Declaración de variables
-    // ==========================================================
+
 
     // Declara una variable con su tipo en el ámbito actual
     public void declareVar(String name, String type) {
@@ -61,9 +68,9 @@ public class ScopeManager {
         declareVar(name, null);
     }
 
-    // ==========================================================
+    
     //  Verificación de variables existentes
-    // ==========================================================
+  
 
     // Comprueba si una variable ya fue declarada en algún ámbito activo
     public boolean isVarDeclared(String name) {
@@ -81,9 +88,7 @@ public class ScopeManager {
         return null;
     }
 
-    // ==========================================================
-    //  Generación de nombres "seguros" (para lambdas o duplicados)
-    // ==========================================================
+    //  Manejo de nombres seguros para evitar colisiones
 
     // Devuelve un nombre único si la variable ya existe en el scope
     public String getSafeName(String original) {
@@ -109,9 +114,9 @@ public class ScopeManager {
         return safeNameMap.getOrDefault(original, original);
     }
 
-    // ==========================================================
+   
     //  Limpieza y utilidades
-    // ==========================================================
+  
 
     // Limpia todos los ámbitos (por ejemplo, al reiniciar la ejecución)
     public void clear() {

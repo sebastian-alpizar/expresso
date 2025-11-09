@@ -1,10 +1,27 @@
+<<<<<<< Updated upstream
 // TyperVisitor.java - VERSIÓN CORREGIDA
+=======
+/**
+ * @author Daniel Ramirez
+ * @author Isella Rios
+ * @author Giancarlo Arenas
+ * @author Kaleb Rojas
+ * @author Sebastian Alpizar
+ */
+
+
+// TyperVisitor.java
+>>>>>>> Stashed changes
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 public class TyperVisitor extends ExprBaseVisitor<Void> {
 
     private final Map<String, String> symbolTable = new LinkedHashMap<>();
@@ -15,6 +32,10 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     // Stack para manejar scopes anidados (solo para bindings locales)
     private final Deque<Map<String, String>> scopeStack = new ArrayDeque<>();
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
     private static final Set<String> BUILTIN_TYPES = Set.of(
             "int", "float", "double", "boolean", "string", "any", "void");
 
@@ -28,6 +49,7 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         scopeStack.push(new HashMap<>(symbolTable));
     }
 
+<<<<<<< Updated upstream
     // -------------------------------
     // Gestión de Scopes (solo para bindings locales)
     // -------------------------------
@@ -58,6 +80,11 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     // -------------------------------
     // Métodos principales
     // -------------------------------
+=======
+   
+    // Utilitarios generales
+ 
+>>>>>>> Stashed changes
     public boolean hasErrors() {
         return !errors.isEmpty();
     }
@@ -88,9 +115,15 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         errors.add(kind + " no definido: " + name);
     }
 
+<<<<<<< Updated upstream
     // -------------------------------
     // Two-pass: Primero recolectar declaraciones top-level
     // -------------------------------
+=======
+ 
+    // Programa principal
+ 
+>>>>>>> Stashed changes
     @Override
     public Void visitProgram(ExprParser.ProgramContext ctx) {
         // FASE 1: Solo recolectar declaraciones top-level (sin visitar expresiones)
@@ -116,10 +149,18 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         return null;
     }
 
+<<<<<<< Updated upstream
     /**
      * Fase 1: Solo recolecta declaraciones let sin verificar cuerpos
      */
     private void visitLetStatementForCollection(ExprParser.LetStatementContext ctx) {
+=======
+ 
+    // Declaración let
+   
+    @Override
+    public Void visitLetStatement(ExprParser.LetStatementContext ctx) {
+>>>>>>> Stashed changes
         String varName = ctx.ID().getText();
         if (isDefined(varName)) {
             reportRedefinition("identificador", varName);
@@ -136,10 +177,18 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         addTypingLine(varName + ": " + typeStr);
     }
 
+<<<<<<< Updated upstream
     /**
      * Fase 1: Solo recolecta declaraciones fun sin verificar cuerpos  
      */
     private void visitFunStatementForCollection(ExprParser.FunStatementContext ctx) {
+=======
+ 
+    // Declaración de función
+  
+    @Override
+    public Void visitFunStatement(ExprParser.FunStatementContext ctx) {
+>>>>>>> Stashed changes
         String funName = ctx.ID().getText();
         if (isDefined(funName)) {
             reportRedefinition("función", funName);
@@ -167,7 +216,23 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                 typeStr = "(" + String.join(", ", paramTypes) + " -> " + ret + ")";
         }
 
+<<<<<<< Updated upstream
         addSymbolToGlobal(funName, typeStr);
+=======
+        // Inferir retorno si hay cast explícito
+        if (ctx.type() == null && ctx.expression() != null) {
+            ExprParser.TypeContext inferred = findReturnTypeInExpression(ctx.expression());
+            if (inferred != null) {
+                String ret = renderType(inferred);
+                if (!paramTypes.isEmpty())
+                    typeStr = paramTypes.get(0) + " -> " + ret;
+                else
+                    typeStr = ret;
+            }
+        }
+
+        addSymbol(funName, typeStr);
+>>>>>>> Stashed changes
         addTypingLine(funName + ": " + typeStr);
     }
 
@@ -187,6 +252,7 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         return null;
     }
 
+<<<<<<< Updated upstream
     // -------------------------------
     // Declaración de función - FASE 2  
     // -------------------------------
@@ -335,6 +401,11 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     // -------------------------------
     // Data Statement - Se procesa completamente en FASE 1
     // -------------------------------
+=======
+
+    // Declaración de data
+
+>>>>>>> Stashed changes
     @Override
     public Void visitDataStatement(ExprParser.DataStatementContext ctx) {
         String typeName = ctx.ID().getText();
@@ -378,10 +449,16 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         return null;
     }
 
+<<<<<<< Updated upstream
     // -------------------------------
     // Otros visit methods - FASE 2
     // -------------------------------
     @Override
+=======
+
+    // Otros visit
+
+>>>>>>> Stashed changes
     public Void visitPrintStatement(ExprParser.PrintStatementContext ctx) {
         if (ctx.expressionList() != null) {
             for (ExprParser.ExpressionContext expr : ctx.expressionList().expression()) {
@@ -413,9 +490,52 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         return null;
     }
 
+<<<<<<< Updated upstream
     // -------------------------------
     // Métodos de utilidad
     // -------------------------------
+=======
+    @Override
+    public Void visitPrimaryExpression(ExprParser.PrimaryExpressionContext ctx) {
+        if (ctx.ID() != null && !isDefined(ctx.ID().getText()))
+            reportUndefined("Variable", ctx.ID().getText());
+        if (ctx.expression() != null)
+            visit(ctx.expression());
+        return null;
+    }
+
+    @Override
+    public Void visitMatchExpression(ExprParser.MatchExpressionContext ctx) {
+        visit(ctx.expression());
+        for (var r : ctx.matchRule())
+            visit(r);
+        return null;
+    }
+
+    @Override
+    public Void visitMatchRule(ExprParser.MatchRuleContext ctx) {
+        if (ctx.pattern() != null)
+            visit(ctx.pattern());
+        if (ctx.expression() != null)
+            for (var e : ctx.expression())
+                visit(e);
+        return null;
+    }
+
+    @Override
+    public Void visitDataPattern(ExprParser.DataPatternContext ctx) {
+        if (!isDefined(ctx.ID().getText()))
+            reportUndefined("Constructor (en pattern)", ctx.ID().getText());
+        if (ctx.pattern() != null)
+            for (var p : ctx.pattern())
+                visit(p);
+        return null;
+    }
+
+
+    // Render y validaciones
+
+>>>>>>> Stashed changes
     private String renderType(ExprParser.TypeContext t) {
         if (t == null) return "~";
         String text = t.getText();
@@ -452,4 +572,136 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                 checkTypeDefinedRecursively(sub);
         }
     }
+<<<<<<< Updated upstream
 }
+=======
+
+
+    // Lambda utils con DEBUG 
+    private ExprParser.LambdaExpressionContext findNestedLambda(ExprParser.ExpressionContext expr) {
+        if (expr == null)
+            return null;
+        if (expr.lambdaExpression() != null)
+            return expr.lambdaExpression();
+        for (int i = 0; i < expr.getChildCount(); i++) {
+            var c = expr.getChild(i);
+            if (c instanceof ExprParser.ExpressionContext sub) {
+                var found = findNestedLambda(sub);
+                if (found != null)
+                    return found;
+            }
+        }
+        return null;
+    }
+
+   
+    private String tryExtractLambdaDeclaredType(ExprParser.LambdaExpressionContext lambda, String contextName,
+            ParserRuleContext fullExpr) {
+        if (lambda == null)
+            return null;
+        ExprParser.LambdaParamsContext lp = lambda.lambdaParams();
+        if (lp == null)
+            return null;
+
+        List<String> paramTypes = new ArrayList<>();
+        if (lp.typedLambdaParams() != null)
+            for (var t : lp.typedLambdaParams().typedParam()) {
+                paramTypes.add(renderType(t.type()));
+                checkTypeDefinedRecursively(t.type());
+            }
+
+        String returnType = "~";
+        // 1) buscar un cast explícito dentro de la lambda body (preferible)
+        ExprParser.TypeContext cast = findReturnTypeInExpression(lambda.expression());
+        if (cast != null) {
+            returnType = renderType(cast);
+        } else {
+            // 2) si no hay cast dentro de la lambda, buscar en la expresión completa del RHS
+          
+            if (fullExpr != null) {
+                ExprParser.TypeContext castOuter = findReturnTypeInExpression((ExprParser.ExpressionContext) fullExpr);
+                if (castOuter != null) {
+                    returnType = renderType(castOuter);
+                }
+            }
+        }
+
+        // 3) heurística sobre el cuerpo si aún no determinamos
+        if ("~".equals(returnType)) {
+            String body = lambda.expression().getText();
+            if (body.matches(".*(==|!=|&&|\\|\\||<|>|<=|>=).*"))
+                returnType = "boolean";
+            else if (body.matches(".*\".*\".*") || body.contains("String.valueOf"))
+                returnType = "string";
+            else if (body.matches(".*\\d+\\.\\d+.*"))
+                returnType = "double";
+            else if (body.matches(".*\\d+.*") && body.matches(".*\\+.*|.*-.*|.*\\*.*|.*/.*"))
+                returnType = "int";
+            else if (body.contains("^") || body.contains("new "))
+                returnType = "any";
+            // no sobreescribir si heurística débil no se ajusta
+        }
+
+        // formar resultado
+        String result;
+        if (paramTypes.isEmpty())
+            result = "~";
+        else if (paramTypes.size() == 1)
+            result = paramTypes.get(0) + " -> " + returnType;
+        else
+            result = "(" + String.join(", ", paramTypes) + " -> " + returnType + ")";
+
+        return result;
+    }
+
+    // Busca el primer CastExpressionContext dentro de cualquier subárbol de la
+    // expresión
+    private ExprParser.TypeContext findReturnTypeInExpression(ExprParser.ExpressionContext expr) {
+        if (expr == null)
+            return null;
+
+        // Caso directo
+        if (expr.castExpression() != null && expr.castExpression().type() != null) {
+            return expr.castExpression().type();
+        }
+
+        // Recorrido general (profundo)
+        for (int i = 0; i < expr.getChildCount(); i++) {
+            var child = expr.getChild(i);
+
+            // 🔹 Si el hijo es un CastExpressionContext con tipo -> ¡encontrado!
+            if (child instanceof ExprParser.CastExpressionContext cast && cast.type() != null) {
+                return cast.type();
+            }
+
+            // 🔹 Si es cualquier otro ParserRuleContext, seguir buscando dentro
+            if (child instanceof ParserRuleContext prc) {
+                var found = findReturnTypeInExpressionRecursive(prc);
+                if (found != null)
+                    return found;
+            }
+        }
+        return null;
+    }
+
+    // Recorrido recursivo auxiliar para cualquier nodo ParserRuleContext
+    private ExprParser.TypeContext findReturnTypeInExpressionRecursive(ParserRuleContext node) {
+        if (node == null)
+            return null;
+
+        if (node instanceof ExprParser.CastExpressionContext cast && cast.type() != null) {
+            return cast.type();
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            var child = node.getChild(i);
+            if (child instanceof ParserRuleContext prc) {
+                var found = findReturnTypeInExpressionRecursive(prc);
+                if (found != null)
+                    return found;
+            }
+        }
+        return null;
+    }
+}
+>>>>>>> Stashed changes

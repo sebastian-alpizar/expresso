@@ -1,3 +1,11 @@
+/**
+ * @author Daniel Ramirez
+ * @author Isella Rios
+ * @author Giancarlo Arenas
+ * @author Kaleb Rojas
+ * @author Sebastian Alpizar
+ */
+
 import java.util.*;
 
 // Este visitor se encarga EXCLUSIVAMENTE de visitar las sentencias `data`
@@ -11,20 +19,20 @@ public class DataVisitor extends ExprBaseVisitor<String> {
     private final StringBuilder generatedCode = new StringBuilder();
 
 
-    // ==========================================================
+
     //  Método principal: visita un nodo `dataStatement`
-    // ==========================================================
+
     @Override
     public String visitDataStatement(ExprParser.DataStatementContext ctx) {
-        // Extrae el nombre del tipo de datos, por ejemplo "Shape"
+        // Extrae el nombre del tipo de datos
         String typeName = ctx.ID().getText();
 
-        // Lista que contendrá todos los constructores (Circle, Rectangle, etc.)
+        // Lista que contendrá todos los constructores 
         List<DataTypeGenerator.ConstructorDef> constructors = new ArrayList<>();
 
         // Recorre cada constructor definido dentro del "data"
         for (ExprParser.ConstructorContext cctx : ctx.constructorList().constructor()) {
-            String name = cctx.ID().getText(); // Nombre del constructor (p. ej. Circle)
+            String name = cctx.ID().getText(); 
 
             // Crea una definición de constructor vacía
             DataTypeGenerator.ConstructorDef def = new DataTypeGenerator.ConstructorDef(name);
@@ -54,7 +62,7 @@ public class DataVisitor extends ExprBaseVisitor<String> {
         // Agrega el código generado al StringBuilder general
         generatedCode.append(generator.getTopLevelCode()).append("\n");
 
-        // (esta llamada adicional a getTopLevelCode() no tiene efecto; podría eliminarse)
+       
         generator.getTopLevelCode();
 
         // No devuelve nada porque el código se acumula en `generatedCode`
@@ -62,17 +70,17 @@ public class DataVisitor extends ExprBaseVisitor<String> {
     }
 
 
-    // ==========================================================
+
     //  Devuelve todo el código generado de los `data`
-    // ==========================================================
+
     public String getGeneratedCode() {
         return generatedCode.toString();
     }
 
 
-    // ==========================================================
+
     //  Limpia el código generado (para reiniciar el visitor)
-    // ==========================================================
+  
     public void clear() {
         generatedCode.setLength(0);
     }

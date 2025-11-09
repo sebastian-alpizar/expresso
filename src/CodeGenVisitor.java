@@ -1,11 +1,18 @@
+/**
+ * @author Daniel Ramirez
+ * @author Isella Rios
+ * @author Giancarlo Arenas
+ * @author Kaleb Rojas
+ * @author Sebastian Alpizar
+ */
+
+
 import java.util.*;
 // import org.antlr.v4.runtime.ParserRuleContext;
 
 public class CodeGenVisitor extends ExprBaseVisitor<String> {
     /*
-     * ================================================================
      * 1. CAMPOS PRINCIPALES Y VISITORS AUXILIARES
-     * ================================================================
      */
     private final ScopeManager scopeManager = new ScopeManager();
     private final DataVisitor dataVisitor = new DataVisitor();
@@ -20,9 +27,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     private boolean insideLetAssignment = false; // Nuevo flag para detectar contexto
 
     /*
-     * ================================================================
      * 2. GESTIÓN DE LAMBDAS TOP-LEVEL Y RECURSIVAS
-     * ================================================================
      */
 
     private boolean isTopLevelLambda(String name) {
@@ -131,9 +136,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
 
     /*
-     * ================================================================
      * 3. VISITAS DE SENTENCIAS PRINCIPALES
-     * ================================================================
      */
 
     @Override
@@ -154,13 +157,12 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             String result = visit(stmt);
             if (result != null && !result.trim().isEmpty() && !result.startsWith("public static")) {
                 String trimmed = result.trim();
-                // ⚙️ FIX: ignorar lambdas sueltas que no están asignadas ni llamadas
+             
                 if (trimmed.matches("^[a-zA-Z0-9_\\(\\)\\s,]*->.*") && !trimmed.contains("=")) {
                     System.out.printf("[WARN] Lambda suelta ignorada en main: %s%n", trimmed);
-                    continue; // no agregar al cuerpo principal
-                }
+                    continue; 
 
-                // Asegurar que termina con ';'
+               
                 if (!trimmed.endsWith(";")) {
                     result = result + ";";
                 }
@@ -200,8 +202,8 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             boolean isRecursive = isRecursiveLambda(varName, lambda);
             Set<String> deps = getReferencedVars(lambda);
 
-            // Si esta lambda es usada como dependencia por otra recursiva, se debe mover
-            // también
+            // Si esta lambda es usada como dependencia por otra recursiva, se debe mover tambien
+          
             if (isRecursive) {
                 for (String dep : deps) {
                     if (scopeManager.isVarDeclared(dep) && !isTopLevelLambda(dep))
@@ -225,7 +227,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 // Caso normal (lambda no recursiva)
                 String value = visit(lambda);
 
-                // 🔍 DEBUG LAMBDA EN LET
+                // LAMBDA EN LET
                 String inferredType = inferType(ctx.expression());
                 System.out.printf("[DEBUG LET] Variable '%s': declarado=%s, inferido=%s%n", varName, type,
                         inferredType);
@@ -300,8 +302,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         String body = visit(ctx.expression());
         System.out.printf("[DEBUG FUN BODY] %s => %s%n", funName, body);
 
-        // ---- HEURÍSTICA: si el cuerpo hace pattern-match sobre 'a' (Nil/Cons),
-        // forzamos tipo a List ----
+       
         if (body != null) {
             String lower = body.toLowerCase();
             boolean hasSwitchOnA = body.contains("switch (a)") || body.contains("switch(a)");
@@ -309,8 +310,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             boolean hasCaseNil = body.contains("case Nil()") || body.contains("case Nil ()");
 
             if (hasSwitchOnA || hasCaseCons || hasCaseNil) {
-                // buscar el índice del parámetro que se llama 'a' (u otro nombre que aparezca
-                // en switch)
+                // buscar el índice del parámetro 
                 for (int i = 0; i < paramNames.size(); i++) {
                     String pname = paramNames.get(i);
                     // si el body contiene "switch (pname)" o "case Cons(var first, var rest) ->"
@@ -351,9 +351,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
 
     /*
-     * ================================================================
      * 4. VISITAS DE EXPRESIONES Y OPERACIONES
-     * ================================================================
      */
 
     @Override
@@ -547,8 +545,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         // Solo debemos aplicar parámetros si el cuerpo es una variable función, no si
         // es una lambda literal
         if (body != null && body.contains("->") && !params.isEmpty()) {
-            // En este caso, la lambda ya está correcta, no necesitamos aplicar .apply()
-            // Por ejemplo: para "x -> z -> ...", el cuerpo "z -> ..." ya es correcto
             return body;
         }
         return body;
@@ -680,7 +676,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
         String targetType = ctx.type().getText().trim();
 
-        // 🔍 DEBUG CAST
+      
         System.out.printf("[DEBUG CAST] expr='%s'  targetType='%s'%n", expr, targetType);
 
         if (expr == null || expr.isEmpty())
@@ -801,9 +797,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
 
     /*
-     * ================================================================
      * 5. INFERENCIA Y MANEJO DE TIPOS
-     * ================================================================
      */
     private String inferPrimitiveType(String exprCode) {
         System.out.printf("[DEBUG inferPrimitiveType] expr='%s'%n", exprCode);
@@ -1038,7 +1032,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 return scopedType;
         }
 
-        // PASO 4: Delegar a inferencia primitiva
+        // PASO 5: Delegar a inferencia primitiva
         return inferPrimitiveType(visit(expr));
     }
 
@@ -1075,9 +1069,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
 
     /*
-     * ================================================================
      * 6. UTILIDADES FINALES
-     * ================================================================
      */
 
     public String getMainBody() {
