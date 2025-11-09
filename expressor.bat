@@ -92,7 +92,8 @@ if "%1"=="transpile" (
 
     if "!NEED_COMPILE!"=="1" (
         echo [2/3] Compilando transpilador...
-        javac -cp "%ANTLR_JAR%;." -d "%TRANSPILER_BIN%" "%PARSER_OUT%\*.java" "%TRANSPILER_SRC%\*.java"
+        :: Considerar las comillas, error (Daniel)
+        javac -cp %ANTLR_JAR%;. -d %TRANSPILER_BIN% %PARSER_OUT%\*.java %TRANSPILER_SRC%\*.java
         if errorlevel 1 (
             echo [ERROR] Error compilando el transpilador.
             exit /b 1

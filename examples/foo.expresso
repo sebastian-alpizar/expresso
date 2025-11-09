@@ -1,0 +1,14 @@
+// File foo.expresso
+let z:double = 1
+let x = 0
+let goo:int -> string =
+x:int -> (z+x:string):boolean
+print("666.66":int)
+let add1: any -> any = x -> x + 1
+data gender{
+Male, Female
+}
+data opt{
+None,
+Some(value:any)
+}
