@@ -53,17 +53,6 @@ java 23.0.1 2024-10-15 javac 23.0.1
 4. **Aplicar Cambios:**
    - Cerrar todas las ventanas con "Aceptar"
    - Importante: Cerrar y abrir nuevamente la terminal/cmd
-  
-### 3. Agregar el .bat al PATH
-Abre PowerShell como Administrador
-
-Ejecuta:
-
-```bash
-powershell
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "Machine") + ";C:\Users\tu-usuario\Downloads\expresso", "Machine")
-```
-Reemplaza `C:\Users\tu-usuario\Downloads\expresso` por el directorio en donde tienes el proyecto para ubicar el archivo .bat al sistema
 
 ## ⚙️ Comandos Disponibles
 
