@@ -67,7 +67,7 @@ typeList
 // ------------------------
 
 printStatement
-    : 'print' '(' expression ')'
+    : 'print' '(' expressionList ')'
     ;
 
 // ------------------------

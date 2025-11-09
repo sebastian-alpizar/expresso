@@ -350,16 +350,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         return "";
     }
 
-    @Override
-    public String visitPrintStatement(ExprParser.PrintStatementContext ctx) {
-        String value = visit(ctx.expression());
-        if (insideLetAssignment) {
-            needsPrintFunction = true; // Asegurar que se genere la función
-            return String.format("print(%s)", value);
-        } else
-            return String.format("System.out.println(%s);", value);
-    }
-
     /*
      * ================================================================
      * 4. VISITAS DE EXPRESIONES Y OPERACIONES
@@ -1124,5 +1114,37 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 """;
         // Insertar al principio del código top-level
         topLevel.insert(0, printMethod + "\n");
+    }
+
+    // Reemplazar el método visitPrintStatement en CodeGenVisitor.java
+
+    @Override
+    public String visitPrintStatement(ExprParser.PrintStatementContext ctx) {
+        // Procesar todos los argumentos del print
+        List<String> args = new ArrayList<>();
+
+        if (ctx.expressionList() != null) {
+            for (ExprParser.ExpressionContext expr : ctx.expressionList().expression()) {
+                args.add(visit(expr));
+            }
+        }
+
+        // Si hay múltiples argumentos, concatenarlos con " " como separador
+        String printValue;
+        if (args.isEmpty()) {
+            printValue = "\"\"";
+        } else if (args.size() == 1) {
+            printValue = args.get(0);
+        } else {
+            // Concatenar argumentos: "texto" + " " + resultado
+            printValue = String.join(" + \" \" + ", args);
+        }
+
+        if (insideLetAssignment) {
+            needsPrintFunction = true;
+            return String.format("print(%s)", printValue);
+        } else {
+            return String.format("System.out.println(%s);", printValue);
+        }
     }
 }

@@ -11,8 +11,6 @@ import org.antlr.v4.runtime.tree.TerminalNode;
  * - Detecta redefiniciones (variables, funciones, tipos, constructores)
  * - Detecta referencias a identificadores no definidos (incluyendo tipos)
  * - Genera <filename>.typings con las asociaciones
- *
- * Añadido: debug ampliado (DEBUG_LEVEL)
  */
 public class TyperVisitor extends ExprBaseVisitor<Void> {
 
@@ -21,12 +19,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     private final Set<String> errors = new LinkedHashSet<>();
     private final String fileName;
 
-    /**
-     * DEBUG_LEVEL:
-     * 0 = off
-     * 1 = básico (lambda detectada + resultado)
-     * 2 = verboso (imprime cuerpos, búsqueda de casts, árbol de expresión)
-     */
     private static final Set<String> BUILTIN_TYPES = Set.of(
             "int", "float", "double", "boolean", "string", "any", "void");
 
@@ -105,7 +97,7 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             checkTypeDefinedRecursively(ctx.type());
         }
 
-        // 🔍 Inferencia de lambdas (directas o anidadas)
+        // Inferencia de lambdas
         if (ctx.expression() != null) {
             ExprParser.LambdaExpressionContext lambda = ctx.expression().lambdaExpression();
             if (lambda == null)
@@ -115,15 +107,11 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                 if (inferred != null && !inferred.equals("~"))
                     typeStr = inferred;
             } else {
-                // si no es lambda, aún intentamos encontrar un cast dentro de la expresión
                 ExprParser.TypeContext found = findReturnTypeInExpression(ctx.expression());
                 if (found != null) {
                     String foundTxt = renderType(found);
-                    if (ctx.type() == null) {
-                        // solo asignar si es tipo plano (int/boolean/string/...)
-                        if (!foundTxt.equals("~"))
-                            typeStr = foundTxt;
-                    }
+                    if (ctx.type() == null && !foundTxt.equals("~"))
+                        typeStr = foundTxt;
                 }
             }
         }
@@ -167,13 +155,15 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             typeStr = "(" + String.join(", ", paramTypes) + " -> ~)";
         }
 
-        // 🔍 Inferir retorno si hay cast explícito
+        // Inferir retorno si hay cast explícito
         if (ctx.type() == null && ctx.expression() != null) {
             ExprParser.TypeContext inferred = findReturnTypeInExpression(ctx.expression());
             if (inferred != null) {
                 String ret = renderType(inferred);
-                if (!paramTypes.isEmpty())
+                if (paramTypes.size() == 1)
                     typeStr = paramTypes.get(0) + " -> " + ret;
+                else if (!paramTypes.isEmpty())
+                    typeStr = "(" + String.join(", ", paramTypes) + " -> " + ret + ")";
                 else
                     typeStr = ret;
             }
@@ -197,6 +187,7 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
 
         addSymbol(typeName, "type");
         List<String> ctorNames = new ArrayList<>();
+        List<String> ctorLines = new ArrayList<>();
 
         for (ExprParser.ConstructorContext cc : ctx.constructorList().constructor()) {
             String ctor = cc.ID().getText();
@@ -218,10 +209,15 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                 ctorArg = args.size() == 1 ? args.get(0) : "(" + String.join(", ", args) + ")";
             }
 
-            addTypingLine(ctor + ": " + ctorArg + " ^ " + typeName);
+            ctorLines.add(ctor + ": " + ctorArg + " ^ " + typeName);
         }
 
+        // ORDEN CORRECTO: primero el tipo, luego los constructores
         addTypingLine(typeName + ": " + String.join("|", ctorNames));
+        for (String line : ctorLines) {
+            addTypingLine(line);
+        }
+
         return null;
     }
 
@@ -230,8 +226,11 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     // -------------------------------
     @Override
     public Void visitPrintStatement(ExprParser.PrintStatementContext ctx) {
-        if (ctx.expression() != null)
-            visit(ctx.expression());
+        if (ctx.expressionList() != null) {
+            for (ExprParser.ExpressionContext expr : ctx.expressionList().expression()) {
+                visit(expr);
+            }
+        }
         return null;
     }
 
@@ -259,8 +258,15 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
 
     @Override
     public Void visitPrimaryExpression(ExprParser.PrimaryExpressionContext ctx) {
-        if (ctx.ID() != null && !isDefined(ctx.ID().getText()))
-            reportUndefined("Variable", ctx.ID().getText());
+        if (ctx.ID() != null) {
+            String name = ctx.ID().getText();
+            // Ignorar el wildcard underscore
+            // También ignorar si estamos dentro de un pattern (pero esto ya se maneja en
+            // visitMatchRule)
+            if (!name.equals("_") && !isDefined(name)) {
+                reportUndefined("Variable", name);
+            }
+        }
         if (ctx.expression() != null)
             visit(ctx.expression());
         return null;
@@ -268,7 +274,10 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
 
     @Override
     public Void visitMatchExpression(ExprParser.MatchExpressionContext ctx) {
+        // Visitar la expresión a evaluar
         visit(ctx.expression());
+
+        // Visitar las reglas del match
         for (var r : ctx.matchRule())
             visit(r);
         return null;
@@ -276,21 +285,57 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
 
     @Override
     public Void visitMatchRule(ExprParser.MatchRuleContext ctx) {
-        if (ctx.pattern() != null)
-            visit(ctx.pattern());
-        if (ctx.expression() != null)
-            for (var e : ctx.expression())
+        // NO visitar el pattern para validación de símbolos
+        // Los patterns crean bindings locales, no usan símbolos existentes
+        // SOLO validar constructores en los patterns
+        if (ctx.pattern() != null) {
+            visitPatternForConstructors(ctx.pattern());
+        }
+
+        // Visitar las expresiones (condición when y resultado)
+        if (ctx.expression() != null) {
+            for (var e : ctx.expression()) {
                 visit(e);
+            }
+        }
         return null;
+    }
+
+    private void visitPatternForConstructors(ExprParser.PatternContext pattern) {
+        if (pattern.dataPattern() != null) {
+            ExprParser.DataPatternContext dp = pattern.dataPattern();
+            String id = dp.ID().getText();
+
+            // SOLO validar si empieza con mayúscula (es un constructor)
+            // Los identificadores con minúscula son variables de binding
+            if (Character.isUpperCase(id.charAt(0))) {
+                if (!isDefined(id)) {
+                    reportUndefined("Constructor (en pattern)", id);
+                }
+            }
+            // Si empieza con minúscula o es _, es una variable de binding, ignorar
+
+            // Procesar subpatterns recursivamente
+            if (dp.pattern() != null) {
+                for (ExprParser.PatternContext subPattern : dp.pattern()) {
+                    visitPatternForConstructors(subPattern);
+                }
+            }
+        }
+        // Ignorar nativePattern: son literales, no necesitan validación
     }
 
     @Override
     public Void visitDataPattern(ExprParser.DataPatternContext ctx) {
-        if (!isDefined(ctx.ID().getText()))
-            reportUndefined("Constructor (en pattern)", ctx.ID().getText());
-        if (ctx.pattern() != null)
-            for (var p : ctx.pattern())
-                visit(p);
+        // Este método ya no se usa directamente, usamos visitPatternForConstructors
+        // Pero lo dejamos por si acaso se llama desde otro lugar
+        String ctor = ctx.ID().getText();
+
+        if (!isDefined(ctor)) {
+            reportUndefined("Constructor (en pattern)", ctor);
+        }
+
+        // NO visitar subpatterns para validación general
         return null;
     }
 
@@ -300,8 +345,20 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     private String renderType(ExprParser.TypeContext t) {
         if (t == null)
             return "~";
-        String raw = t.getText().trim().replaceAll("\\s+", "");
-        return raw.replaceAll("[()]", "");
+
+        String text = t.getText();
+
+        // Para tipos simples, devolver directamente
+        if (BUILTIN_TYPES.contains(text))
+            return text;
+
+        // Para tipos función, preservar estructura
+        if (text.contains("->")) {
+            // Normalizar espacios alrededor de ->
+            return text.replaceAll("\\s+", "").replace("->", " -> ");
+        }
+
+        return text;
     }
 
     private String renderFlatType(ExprParser.FlatTypeContext ft) {
@@ -325,7 +382,8 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             var c = t.getChild(i);
             if (c instanceof TerminalNode tn) {
                 String txt = tn.getText();
-                if (Character.isLetter(txt.charAt(0)) && !BUILTIN_TYPES.contains(txt) && !isDefined(txt))
+                if (!txt.isEmpty() && Character.isLetter(txt.charAt(0)) &&
+                        !BUILTIN_TYPES.contains(txt) && !isDefined(txt))
                     reportUndefined("Tipo", txt);
             } else if (c instanceof ExprParser.TypeContext sub)
                 checkTypeDefinedRecursively(sub);
@@ -333,7 +391,7 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
     }
 
     // -------------------------------
-    // Lambda utils con DEBUG (mejorada)
+    // Lambda utils
     // -------------------------------
     private ExprParser.LambdaExpressionContext findNestedLambda(ExprParser.ExpressionContext expr) {
         if (expr == null)
@@ -351,14 +409,8 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         return null;
     }
 
-    /**
-     * tryExtractLambdaDeclaredType: ahora con más heurísticas y debug.
-     * - lambda: nodo lambda
-     * - contextName: nombre de la variable/function donde se detectó (para debug)
-     * - fullExpr: expresión completa del RHS (puede ayudar a buscar casts más
-     * arriba)
-     */
-    private String tryExtractLambdaDeclaredType(ExprParser.LambdaExpressionContext lambda, String contextName,
+    private String tryExtractLambdaDeclaredType(ExprParser.LambdaExpressionContext lambda,
+            String contextName,
             ParserRuleContext fullExpr) {
         if (lambda == null)
             return null;
@@ -374,70 +426,49 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             }
 
         String returnType = "~";
-        // 1) buscar un cast explícito dentro de la lambda body (preferible)
         ExprParser.TypeContext cast = findReturnTypeInExpression(lambda.expression());
         if (cast != null) {
             returnType = renderType(cast);
-        } else {
-            // 2) si no hay cast dentro de la lambda, buscar en la expresión completa del
-            // RHS
-            if (fullExpr != null) {
-                ExprParser.TypeContext castOuter = findReturnTypeInExpression((ExprParser.ExpressionContext) fullExpr);
-                if (castOuter != null) {
-                    returnType = renderType(castOuter);
-                }
+        } else if (fullExpr != null) {
+            ExprParser.TypeContext castOuter = findReturnTypeInExpression((ExprParser.ExpressionContext) fullExpr);
+            if (castOuter != null) {
+                returnType = renderType(castOuter);
             }
         }
 
-        // 3) heurística sobre el cuerpo si aún no determinamos
+        // Heurísticas si no hay cast
         if ("~".equals(returnType)) {
             String body = lambda.expression().getText();
             if (body.matches(".*(==|!=|&&|\\|\\||<|>|<=|>=).*"))
                 returnType = "boolean";
-            else if (body.matches(".*\".*\".*") || body.contains("String.valueOf"))
+            else if (body.matches(".*\".*\".*"))
                 returnType = "string";
             else if (body.matches(".*\\d+\\.\\d+.*"))
                 returnType = "double";
-            else if (body.matches(".*\\d+.*") && body.matches(".*\\+.*|.*-.*|.*\\*.*|.*/.*"))
-                returnType = "int";
-            else if (body.contains("^") || body.contains("new "))
-                returnType = "any";
-            // no sobreescribir si heurística débil no se ajusta
         }
 
-        // formar resultado
-        String result;
+        // Formar resultado
         if (paramTypes.isEmpty())
-            result = "~";
+            return "~";
         else if (paramTypes.size() == 1)
-            result = paramTypes.get(0) + " -> " + returnType;
+            return paramTypes.get(0) + " -> " + returnType;
         else
-            result = "(" + String.join(", ", paramTypes) + " -> " + returnType + ")";
-
-        return result;
+            return "(" + String.join(", ", paramTypes) + " -> " + returnType + ")";
     }
 
-    // Busca el primer CastExpressionContext dentro de cualquier subárbol de la
-    // expresión
     private ExprParser.TypeContext findReturnTypeInExpression(ExprParser.ExpressionContext expr) {
         if (expr == null)
             return null;
 
-        // Caso directo
         if (expr.castExpression() != null && expr.castExpression().type() != null) {
             return expr.castExpression().type();
         }
 
-        // Recorrido general (profundo)
         for (int i = 0; i < expr.getChildCount(); i++) {
             var child = expr.getChild(i);
-
-            // 🔹 Si el hijo es un CastExpressionContext con tipo -> ¡encontrado!
             if (child instanceof ExprParser.CastExpressionContext cast && cast.type() != null) {
                 return cast.type();
             }
-
-            // 🔹 Si es cualquier otro ParserRuleContext, seguir buscando dentro
             if (child instanceof ParserRuleContext prc) {
                 var found = findReturnTypeInExpressionRecursive(prc);
                 if (found != null)
@@ -447,7 +478,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         return null;
     }
 
-    // Recorrido recursivo auxiliar para cualquier nodo ParserRuleContext
     private ExprParser.TypeContext findReturnTypeInExpressionRecursive(ParserRuleContext node) {
         if (node == null)
             return null;
