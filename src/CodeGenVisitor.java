@@ -147,18 +147,27 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             if (stmt.dataStatement() != null) {
                 dataVisitor.visit(stmt.dataStatement());
                 topLevel.append(dataVisitor.getGeneratedCode()).append("\n");
-                dataVisitor.clear(); // Limpieza obligatoria
+                dataVisitor.clear();
                 continue;
             }
+
             String result = visit(stmt);
             if (result != null && !result.trim().isEmpty() && !result.startsWith("public static")) {
-                // Si el resultado NO termina con ;, agregarlo (para statements)
-                if (!result.trim().endsWith(";")) {
+                String trimmed = result.trim();
+                // ⚙️ FIX: ignorar lambdas sueltas que no están asignadas ni llamadas
+                if (trimmed.matches("^[a-zA-Z0-9_\\(\\)\\s,]*->.*") && !trimmed.contains("=")) {
+                    System.out.printf("[WARN] Lambda suelta ignorada en main: %s%n", trimmed);
+                    continue; // no agregar al cuerpo principal
+                }
+
+                // Asegurar que termina con ';'
+                if (!trimmed.endsWith(";")) {
                     result = result + ";";
                 }
                 mainBody.append("    ").append(result).append("\n");
             }
         }
+
         scopeManager.exitScope();
         mainBody.append("}\n");
         return mainBody.toString();
@@ -194,9 +203,7 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
             // Si esta lambda es usada como dependencia por otra recursiva, se debe mover
             // también
             if (isRecursive) {
-                // Antes de generar el método recursivo, elevar sus dependencias si son lambdas
                 for (String dep : deps) {
-                    // Si la dependencia fue declarada dentro del main (y no ya movida)
                     if (scopeManager.isVarDeclared(dep) && !isTopLevelLambda(dep))
                         promoteLambdaToTopLevel(dep);
                 }
@@ -217,8 +224,21 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
                 // Caso normal (lambda no recursiva)
                 String value = visit(lambda);
+
+                // 🔍 DEBUG LAMBDA EN LET
+                String inferredType = inferType(ctx.expression());
+                System.out.printf("[DEBUG LET] Variable '%s': declarado=%s, inferido=%s%n", varName, type,
+                        inferredType);
+
+                if (type.startsWith("Function<") && inferredType.startsWith("Function<")
+                        && !type.equals(inferredType)) {
+                    System.out.printf("[CodeGen FIX] Corrigiendo tipo de '%s': %s → %s%n", varName, type, inferredType);
+                    type = inferredType;
+                }
+
                 pendingLambdaParamTypes = null;
                 insideLetAssignment = false; // Salir del contexto de asignación
+
                 if (!scopeManager.isVarDeclared(varName)) {
                     scopeManager.declareVar(varName, type);
                     return String.format("%s %s = %s;", type, varName, value);
@@ -249,25 +269,80 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     @Override
     public String visitFunStatement(ExprParser.FunStatementContext ctx) {
         String funName = ctx.ID().getText();
-        String returnType = ctx.type() != null ? normalizeType(ctx.type().getText()) : "int";
 
-        scopeManager.declareVar(funName, returnType); // Registrar el nombre de la función
-        scopeManager.enterScope(); // Abrir un nuevo scope para los parámetros
+        // obtener tipo de retorno (si existe), else Object por defecto
+        String returnType = ctx.type() != null ? mapType(ctx.type()) : "Object";
 
+        // registrar nombre de la función (tipo provisional)
+        scopeManager.declareVar(funName, returnType);
+        scopeManager.enterScope();
+
+        // recolectar parámetros (si alguno sin tipo -> Object provisional)
         List<String> params = new ArrayList<>();
-        if (ctx.paramList() != null)
+        List<String> paramNames = new ArrayList<>();
+        if (ctx.paramList() != null) {
             for (ExprParser.ParamContext p : ctx.paramList().param()) {
                 String paramName = p.ID().getText();
-                String paramType = normalizeType(p.type().getText());
+                String paramType = p.type() != null ? mapType(p.type()) : "Object";
+                // registrar en el scope con tipo provisional
+                scopeManager.declareVar(paramName, paramType);
                 params.add(paramType + " " + paramName);
-                scopeManager.declareVar(paramName, paramType); // <- Declaramos los parámetros aquí
+                paramNames.add(paramName);
+
+                System.out.printf("[DEBUG FUN PARAM] %s : %s%n", paramName, paramType);
             }
+        }
 
-        System.out.println("DEBUG funStatement: " + ctx.getText());
-        System.out.println("  expression: " + (ctx.expression() != null ? ctx.expression().getText() : "null"));
+        System.out.printf("[DEBUG FUN DEF] %s -> returnType=%s%n", funName, returnType);
+        System.out.printf("  Full header: %s(%s)%n", funName, String.join(", ", params));
 
+        // generar cuerpo
         String body = visit(ctx.expression());
-        scopeManager.exitScope(); // <- Cerrar scope de parámetros
+        System.out.printf("[DEBUG FUN BODY] %s => %s%n", funName, body);
+
+        // ---- HEURÍSTICA: si el cuerpo hace pattern-match sobre 'a' (Nil/Cons),
+        // forzamos tipo a List ----
+        if (body != null) {
+            String lower = body.toLowerCase();
+            boolean hasSwitchOnA = body.contains("switch (a)") || body.contains("switch(a)");
+            boolean hasCaseCons = body.contains("case Cons(") || body.contains("case Cons (");
+            boolean hasCaseNil = body.contains("case Nil()") || body.contains("case Nil ()");
+
+            if (hasSwitchOnA || hasCaseCons || hasCaseNil) {
+                // buscar el índice del parámetro que se llama 'a' (u otro nombre que aparezca
+                // en switch)
+                for (int i = 0; i < paramNames.size(); i++) {
+                    String pname = paramNames.get(i);
+                    // si el body contiene "switch (pname)" o "case Cons(var first, var rest) ->"
+                    // (usualmente es 'a')
+                    if (body.contains("switch (" + pname + ")") || body.contains("switch(" + pname + ")") ||
+                            body.contains("case Cons(var first, var rest)")
+                            || body.contains("case Cons(var first,var rest)")) {
+                        // actualizar el tipo del parámetro a List si era Object
+                        String current = scopeManager.getVarType(pname);
+                        if (current == null || "Object".equals(current) || "Object".equals(current.trim())) {
+                            scopeManager.declareVar(pname, "List");
+                            // actualizar params list string
+                            params.set(i, "List " + pname);
+                            System.out.printf(
+                                    "[FIX] Forzando tipo de parámetro '%s' a List por pattern-match en cuerpo%n",
+                                    pname);
+                        }
+                    }
+                }
+                // forzar tipo retorno a List si era Object
+                if (returnType == null || "Object".equals(returnType)) {
+                    returnType = "List";
+                    scopeManager.declareVar(funName, returnType);
+                    System.out.printf("[FIX] Forzando tipo de retorno de '%s' a List por pattern-match en cuerpo%n",
+                            funName);
+                }
+            }
+        }
+
+        scopeManager.exitScope();
+
+        // generar método estático final con los tipos ya corregidos
         String functionCode = String.format("public static %s %s(%s) { return %s; }",
                 returnType, funName, String.join(", ", params), body);
 
@@ -615,11 +690,12 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
         String targetType = ctx.type().getText().trim();
 
-        // --- normalizar expresiones ambiguas ---
+        // 🔍 DEBUG CAST
+        System.out.printf("[DEBUG CAST] expr='%s'  targetType='%s'%n", expr, targetType);
+
         if (expr == null || expr.isEmpty())
             expr = "null";
 
-        // --- lógica principal ---
         switch (targetType) {
             case "int" -> {
                 // Si el valor es cadena, usar Integer.parseInt(...)
@@ -634,12 +710,9 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 return "(double)(" + expr + ")";
             }
             case "boolean" -> {
-                // No forzar conversión si ya parece ser booleana
                 if (expr.matches(".*(==|!=|&&|\\|\\|).*") ||
                         expr.equals("true") || expr.equals("false"))
                     return expr;
-                // Si la expresión es numérica o cadena -> usar comparación != 0 o
-                // equals("true")
                 if (expr.matches("^[0-9\\.]+$"))
                     return "(" + expr + " != 0)";
                 if (expr.startsWith("\""))
@@ -647,8 +720,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 return "Boolean.valueOf(" + expr + ")";
             }
             case "string" -> {
-                // Convertir SIEMPRE a cadena, incluso si ya lo era
-                // Pero evita doble envoltura innecesaria
                 if (expr.startsWith("\""))
                     return expr;
                 if (expr.startsWith("String.valueOf("))
@@ -656,7 +727,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
                 return "String.valueOf(" + expr + ")";
             }
             default -> {
-                // Cast genérico (por ejemplo: ^Some(...))
                 return "((" + capitalize(targetType) + ")(" + expr + "))";
             }
         }
@@ -745,8 +815,9 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
      * 5. INFERENCIA Y MANEJO DE TIPOS
      * ================================================================
      */
-
     private String inferPrimitiveType(String exprCode) {
+        System.out.printf("[DEBUG inferPrimitiveType] expr='%s'%n", exprCode);
+
         if (exprCode == null)
             return "int";
         exprCode = exprCode.trim();
@@ -754,26 +825,18 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         if (exprCode.startsWith("print("))
             return "Void";
 
-        // PRIORIDAD 1: Variables en scope (más confiable)
         if (scopeManager.isVarDeclared(exprCode)) {
             String scopedType = scopeManager.getVarType(exprCode);
             if (scopedType != null)
                 return normalizeType(scopedType);
         }
 
-        // PRIORIDAD 2: Detectar strings (entre comillas)
         if ((exprCode.startsWith("\"") && exprCode.endsWith("\"")) ||
                 exprCode.contains(".valueOf(") ||
                 exprCode.equals("String.valueOf")) {
             return "String";
         }
 
-        // PRIORIDAD 3: Detectar expresiones ternarias (para análisis recursivo)
-        if (exprCode.contains("?") && exprCode.contains(":"))
-            return "var"; // Simplificación: para ternarias anidadas, devolver var y dejar que el nivel
-                          // superior lo resuelva
-
-        // PRIORIDAD 4: Literales y patrones existentes
         if (exprCode.equals("true") || exprCode.equals("false"))
             return "boolean";
         if (exprCode.matches("^[0-9]+\\.[0-9]+f?$") || exprCode.endsWith("f") && !exprCode.contains("\""))
@@ -783,7 +846,6 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
         if (exprCode.contains("Math.pow") || exprCode.contains("(float)"))
             return "float";
 
-        // Detectar operadores booleanos
         if (exprCode.contains("||") || exprCode.contains("&&") ||
                 exprCode.contains("==") || exprCode.contains("!=") ||
                 exprCode.contains("<") || exprCode.contains(">") ||
@@ -837,7 +899,14 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
     // convierte a wrappers Java (int -> Integer, float -> Float)
     private String mapTypeName(String t) {
+        if (t == null)
+            return "Object";
         t = t.trim();
+        if (t.isEmpty()) {
+            System.out.println("[WARN mapTypeName] tipo vacío detectado, usando Object");
+            return "Object";
+        }
+
         return switch (t) {
             case "int" -> "Integer";
             case "float" -> "Float";
@@ -907,6 +976,8 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
 
         // Paso 3: Caso específico para expresiones lambda
         if (expr.lambdaExpression() != null) {
+            System.out.printf("[DEBUG INFER λ] Lambda detectada en '%s'%n", expr.getText());
+
             var lambda = expr.lambdaExpression();
             int paramCount = getLambdaParamCount(lambda.lambdaParams());
 
@@ -1026,6 +1097,10 @@ public class CodeGenVisitor extends ExprBaseVisitor<String> {
     }
 
     private String capitalize(String s) {
+        if (s == null || s.isEmpty()) {
+            System.out.println("[WARN capitalize] cadena vacía recibida");
+            return "Object"; // fallback seguro
+        }
         return s.substring(0, 1).toUpperCase() + s.substring(1);
     }
 

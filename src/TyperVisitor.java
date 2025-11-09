@@ -27,8 +27,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
      * 1 = básico (lambda detectada + resultado)
      * 2 = verboso (imprime cuerpos, búsqueda de casts, árbol de expresión)
      */
-    private static final int DEBUG_LEVEL = 2;
-
     private static final Set<String> BUILTIN_TYPES = Set.of(
             "int", "float", "double", "boolean", "string", "any", "void");
 
@@ -107,34 +105,13 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             checkTypeDefinedRecursively(ctx.type());
         }
 
-        // Debug: mostrar el texto de la expresión RHS
-        if (DEBUG_LEVEL >= 1) {
-            String exprText = ctx.expression() != null ? ctx.expression().getText() : "<null>";
-            System.out.printf("[DEBUG LET] %s : declared type='%s' RHS text='%s'%n", varName, typeStr, exprText);
-            if (DEBUG_LEVEL >= 2 && ctx.expression() != null) {
-                System.out.println("[DEBUG LET] dump RHS parse tree:");
-                dumpExprTree(ctx.expression(), 0);
-            }
-        }
-
         // 🔍 Inferencia de lambdas (directas o anidadas)
         if (ctx.expression() != null) {
             ExprParser.LambdaExpressionContext lambda = ctx.expression().lambdaExpression();
             if (lambda == null)
                 lambda = findNestedLambda(ctx.expression());
             if (lambda != null) {
-                if (DEBUG_LEVEL >= 1) {
-                    System.out.printf("[DEBUG] Lambda encontrada para '%s' -> lambda text = '%s'%n",
-                            varName, lambda.getText());
-                    if (DEBUG_LEVEL >= 2) {
-                        System.out.println("[DEBUG] dump lambda subtree:");
-                        dumpExprTree(lambda, 0);
-                    }
-                }
                 String inferred = tryExtractLambdaDeclaredType(lambda, varName, ctx.expression());
-                if (DEBUG_LEVEL >= 1) {
-                    System.out.printf("[DEBUG] Inferencia para '%s' => %s (previo='%s')%n", varName, inferred, typeStr);
-                }
                 if (inferred != null && !inferred.equals("~"))
                     typeStr = inferred;
             } else {
@@ -142,17 +119,11 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                 ExprParser.TypeContext found = findReturnTypeInExpression(ctx.expression());
                 if (found != null) {
                     String foundTxt = renderType(found);
-                    if (DEBUG_LEVEL >= 1)
-                        System.out.printf("[DEBUG] Cast encontrado en RHS de '%s' => %s%n", varName, foundTxt);
-                    // si let no tenía tipo explícito, usarlo como tipo de variable (no para
-                    // funciones)
                     if (ctx.type() == null) {
                         // solo asignar si es tipo plano (int/boolean/string/...)
                         if (!foundTxt.equals("~"))
                             typeStr = foundTxt;
                     }
-                } else if (DEBUG_LEVEL >= 2) {
-                    System.out.printf("[DEBUG] No se encontró cast en RHS de '%s'%n", varName);
                 }
             }
         }
@@ -196,12 +167,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             typeStr = "(" + String.join(", ", paramTypes) + " -> ~)";
         }
 
-        if (DEBUG_LEVEL >= 2) {
-            System.out.printf("[DEBUG FUN] %s params=%s declaredType=%s%n", funName, paramTypes, typeStr);
-            if (ctx.expression() != null)
-                dumpExprTree(ctx.expression(), 0);
-        }
-
         // 🔍 Inferir retorno si hay cast explícito
         if (ctx.type() == null && ctx.expression() != null) {
             ExprParser.TypeContext inferred = findReturnTypeInExpression(ctx.expression());
@@ -211,8 +176,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                     typeStr = paramTypes.get(0) + " -> " + ret;
                 else
                     typeStr = ret;
-                if (DEBUG_LEVEL >= 1)
-                    System.out.printf("[DEBUG] Fun '%s' inferido retorno = %s%n", funName, typeStr);
             }
         }
 
@@ -415,8 +378,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         ExprParser.TypeContext cast = findReturnTypeInExpression(lambda.expression());
         if (cast != null) {
             returnType = renderType(cast);
-            if (DEBUG_LEVEL >= 1)
-                System.out.printf("[DEBUG cast] En lambda '%s' encontrado cast directo: %s%n", contextName, returnType);
         } else {
             // 2) si no hay cast dentro de la lambda, buscar en la expresión completa del
             // RHS
@@ -424,9 +385,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
                 ExprParser.TypeContext castOuter = findReturnTypeInExpression((ExprParser.ExpressionContext) fullExpr);
                 if (castOuter != null) {
                     returnType = renderType(castOuter);
-                    if (DEBUG_LEVEL >= 1)
-                        System.out.printf("[DEBUG cast] En lambda '%s' encontrado cast en RHS externo: %s%n",
-                                contextName, returnType);
                 }
             }
         }
@@ -456,11 +414,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
         else
             result = "(" + String.join(", ", paramTypes) + " -> " + returnType + ")";
 
-        if (DEBUG_LEVEL >= 1) {
-            System.out.printf("[DEBUG] Lambda detectada en '%s': params=%s body=%s => inferido = %s%n",
-                    contextName, paramTypes, lambda.expression().getText(), result);
-        }
-
         return result;
     }
 
@@ -472,8 +425,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
 
         // Caso directo
         if (expr.castExpression() != null && expr.castExpression().type() != null) {
-            if (DEBUG_LEVEL >= 2)
-                System.out.println("[TRACE findReturn] direct cast at top: " + expr.castExpression().getText());
             return expr.castExpression().type();
         }
 
@@ -483,8 +434,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
 
             // 🔹 Si el hijo es un CastExpressionContext con tipo -> ¡encontrado!
             if (child instanceof ExprParser.CastExpressionContext cast && cast.type() != null) {
-                if (DEBUG_LEVEL >= 2)
-                    System.out.println("[TRACE findReturn] cast found: " + cast.getText());
                 return cast.type();
             }
 
@@ -504,8 +453,6 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             return null;
 
         if (node instanceof ExprParser.CastExpressionContext cast && cast.type() != null) {
-            if (DEBUG_LEVEL >= 2)
-                System.out.println("[TRACE findReturn/rec] cast found: " + cast.getText());
             return cast.type();
         }
 
@@ -518,26 +465,5 @@ public class TyperVisitor extends ExprBaseVisitor<Void> {
             }
         }
         return null;
-    }
-
-    // -------------------------------
-    // Helper: imprime subárbol del parse tree (útil para debug)
-    // -------------------------------
-    private void dumpExprTree(ParserRuleContext node, int indent) {
-        if (node == null)
-            return;
-        String pad = "  ".repeat(Math.max(0, indent));
-        System.out.printf("%s- %s : '%s'%n", pad, node.getClass().getSimpleName(), node.getText().replace("\n", "\\n"));
-        for (int i = 0; i < node.getChildCount(); i++) {
-            var child = node.getChild(i);
-            if (child instanceof ParserRuleContext prc)
-                dumpExprTree(prc, indent + 1);
-            else if (child instanceof TerminalNode tn) {
-                System.out.printf("%s  * Terminal: %s -> '%s'%n", pad, tn.getSymbol().getText(), tn.getText());
-            } else {
-                System.out.printf("%s  * Other child: %s -> '%s'%n", pad, child.getClass().getSimpleName(),
-                        child.toString());
-            }
-        }
     }
 }
