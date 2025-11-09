@@ -1,0 +1,44 @@
+// ===============================================
+// Prueba de TyperVisitor - Punto 9 del Spec Final
+// ===============================================
+
+// Declaraciones simples
+let x:int = 10
+let y:float = 3.14
+let msg:string = "Hola mundo"
+let ok:boolean = true
+
+// Error de tipo (x es int, no string)
+let bad:string = x + "abc"
+
+// Redefinición (x ya fue declarado)
+let x:int = 99
+
+// Operaciones válidas
+let suma:int = x + 5
+let mult:float = y * 2.0
+let comp:boolean = x < 100
+
+// Operador incompatible (string + float)
+let wrong:any = msg + y
+
+// Definición de tipo algebraico
+data color = { Rojo, Verde, Azul }
+
+// Instancia de constructor válido
+let c:any = ^Rojo
+
+// Uso de constructor no definido
+let fail:any = ^Amarillo
+
+// Llamada a función no definida
+print(saluda("Tania"))
+
+// Definición de función válida
+fun doble(n:int):int = n * 2
+
+// Llamada válida
+print(doble(4))
+
+// ===============================================
+print("Fin del análisis")

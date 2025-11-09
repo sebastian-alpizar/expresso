@@ -44,12 +44,6 @@ public class Main {
         TyperVisitor typer = new TyperVisitor(baseName + ".expresso");
         typer.visit(tree);
 
-        if (typer.hasErrors()) {
-            typer.printErrors();
-            System.err.println("Build failed due to typing errors");
-            System.exit(1);
-        }
-
         // Crear directorio de salida si no existe
         Path outDirectory = Paths.get(outDir);
         if (!Files.exists(outDirectory)) {
@@ -60,6 +54,13 @@ public class Main {
         Path typingsFile = outDirectory.resolve(baseName + ".expresso.typings");
         typer.generateTypingsFile(typingsFile.toString());
         System.out.println("Generated: " + typingsFile.toAbsolutePath());
+
+        if (typer.hasErrors()) {
+            typer.printErrors();
+  //          typer.generateTypingsFile(outDir + "/" + baseName + ".expresso.typings");
+            System.err.println("Build failed due to typing errors");
+            System.exit(1);
+        }
 
         // ===============================
         // FASE DE GENERACIÓN DE CÓDIGO
